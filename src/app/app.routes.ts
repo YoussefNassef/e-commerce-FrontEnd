@@ -40,6 +40,24 @@ export const routes: Routes = [
     loadComponent: () => import('./features/addresses/addresses-page.component').then((m) => m.AddressesPageComponent)
   },
   {
+    path: 'returns/new',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/orders/returns-new-page.component').then((m) => m.ReturnsNewPageComponent)
+  },
+  {
+    path: 'returns/my',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/orders/returns-my-page.component').then((m) => m.ReturnsMyPageComponent)
+  },
+  {
+    path: 'orders/:id/tracking',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/orders/order-tracking-page.component').then((m) => m.OrderTrackingPageComponent)
+  },
+  {
     path: 'orders',
     canActivate: [authGuard],
     loadComponent: () => import('./features/orders/orders-page.component').then((m) => m.OrdersPageComponent)
@@ -74,6 +92,12 @@ export const routes: Routes = [
     path: 'admin/orders',
     canActivate: [authGuard, adminGuard],
     loadComponent: () => import('./features/admin-orders/admin-orders-page.component').then((m) => m.AdminOrdersPageComponent)
+  },
+  {
+    path: 'admin/returns',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/admin/admin-returns-page.component').then((m) => m.AdminReturnsPageComponent)
   },
   {
     path: 'admin/coupons',

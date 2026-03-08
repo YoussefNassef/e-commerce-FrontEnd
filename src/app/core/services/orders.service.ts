@@ -55,6 +55,12 @@ export class OrdersService {
       .pipe(map((response) => this.normalizeOrder(this.extractSingleOrder(response))));
   }
 
+  cancelOrder(orderId: string) {
+    return this.http
+      .post<unknown>(`${this.api}/orders/${orderId}/cancel`, {})
+      .pipe(map((response) => this.normalizeOrder(this.extractSingleOrder(response))));
+  }
+
   getMyOrders(page = 1, limit = 20) {
     return this.http
       .get<unknown>(`${this.api}/orders/me`, {
@@ -143,6 +149,9 @@ export class OrdersService {
     return {
       id: String(record['id'] ?? ''),
       status: String(record['status'] ?? 'pending_payment').toLowerCase().trim() as Order['status'],
+      deliveryStatus: String(record['deliveryStatus'] ?? '')
+        .toLowerCase()
+        .trim() as Order['deliveryStatus'],
       totalAmount: Number(record['totalAmount'] ?? record['total'] ?? record['amount'] ?? 0),
       createdAt: typeof record['createdAt'] === 'string' ? (record['createdAt'] as string) : new Date().toISOString(),
       items: rawItems.map((item) => this.toOrderItem(this.toRecord(item) ?? {}))

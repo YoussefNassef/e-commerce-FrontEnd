@@ -59,6 +59,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   status: 'pending_payment' | 'payment_initiated' | 'paid' | 'in_progress' | 'completed' | 'cancelled';
+  deliveryStatus?: 'pending' | 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled';
   totalAmount: number;
   items: OrderItem[];
   createdAt: string;

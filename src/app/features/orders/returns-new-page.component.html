@@ -1,0 +1,81 @@
+<section class="returns-shell" dir="rtl">
+  <header class="head">
+    <h1>طلب إرجاع جديد</h1>
+    <p>اختر طلبًا تم تسليمه فقط، أو أدخل رقم الطلب يدويًا.</p>
+  </header>
+
+  @if (notice()) {
+    <div class="banner ok">{{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="banner err">{{ error() }}</div>
+  }
+
+  <app-card>
+    <header class="picker-head">
+      <strong>الطلبات المؤهلة للإرجاع</strong>
+      <app-button size="sm" variant="ghost" [disabled]="loadingOrders()" (pressed)="loadRecentOrders()">
+        @if (loadingOrders()) { جاري التحميل... } @else { تحديث }
+      </app-button>
+    </header>
+
+    @if (ordersError()) {
+      <p class="helper err-text">{{ ordersError() }}</p>
+    } @else if (loadingOrders()) {
+      <div class="order-skeleton-grid">
+        <div class="order-skeleton"></div>
+        <div class="order-skeleton"></div>
+        <div class="order-skeleton"></div>
+      </div>
+    } @else if (!recentOrders().length) {
+      <p class="helper">لا توجد طلبات تم تسليمها حاليًا. يمكنك إدخال رقم الطلب يدويًا.</p>
+    } @else {
+      <div class="order-picker-grid">
+        @for (order of recentOrders(); track order.id) {
+          <article class="order-chip" [class.selected]="form.controls.orderId.value === order.id">
+            <div>
+              <strong>#{{ order.id }}</strong>
+              <small>{{ order.createdAt | date: 'short' }}</small>
+              <small>الإجمالي: {{ order.totalAmount | currency: 'SAR' }}</small>
+            </div>
+            <app-button size="sm" (pressed)="chooseOrder(order)">اختيار</app-button>
+          </article>
+        }
+      </div>
+    }
+  </app-card>
+
+  <app-card>
+    <form [formGroup]="form" class="form-grid" (ngSubmit)="submit()">
+      <label class="field">
+        <span>رقم الطلب (UUID)</span>
+        <input formControlName="orderId" type="text" class="input" />
+      </label>
+
+      @if (form.controls.orderId.touched && form.controls.orderId.invalid) {
+        <small class="err-text">رقم الطلب غير صالح.</small>
+      }
+
+      <label class="field">
+        <span>سبب الإرجاع</span>
+        <select formControlName="reason" class="input">
+          @for (reason of reasons; track reason) {
+            <option [value]="reason">{{ reasonLabel(reason) }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span>تفاصيل إضافية (اختياري)</span>
+        <textarea formControlName="reasonDetails" rows="4" class="input"></textarea>
+      </label>
+
+      <div class="actions">
+        <app-button type="submit" [disabled]="submitting()">
+          @if (submitting()) { جاري الإرسال... } @else { إرسال طلب الإرجاع }
+        </app-button>
+        <a routerLink="/returns/my" class="plain-link">عرض طلبات الإرجاع</a>
+      </div>
+    </form>
+  </app-card>
+</section>

@@ -1,0 +1,200 @@
+:host {
+  display: block;
+}
+
+.returns-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.head h1 {
+  margin: 0;
+  color: #0f2746;
+}
+
+.head p {
+  margin: 0.35rem 0 0;
+  color: #607991;
+}
+
+.banner {
+  padding: 0.8rem 0.95rem;
+  border-radius: 0.9rem;
+  font-weight: 700;
+}
+
+.banner.ok {
+  border: 1px solid #b8ebd7;
+  background: #edfcf5;
+  color: #0e6a4e;
+}
+
+.banner.err {
+  border: 1px solid #ffc7d1;
+  background: #fff2f5;
+  color: #a61d43;
+}
+
+.toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.toolbar label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.toolbar span {
+  color: #21415f;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid #e5eef5;
+  text-align: right;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.table th {
+  color: #566f88;
+  font-size: 0.82rem;
+}
+
+.click-row {
+  cursor: pointer;
+}
+
+.click-row:hover {
+  background: #f7fbff;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.tone-requested {
+  background: #e8f4ff;
+  color: #15548a;
+}
+
+.tone-approved {
+  background: #e7f8ee;
+  color: #146c43;
+}
+
+.tone-rejected {
+  background: #ffe8ec;
+  color: #9b1c35;
+}
+
+.tone-progress {
+  background: #fff5e6;
+  color: #8a5300;
+}
+
+.tone-refunded {
+  background: #dff8f7;
+  color: #0e5964;
+}
+
+.tone-cancelled {
+  background: #f1f3f5;
+  color: #4a5568;
+}
+
+.drawer {
+  height: fit-content;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.timeline p {
+  margin: 0.45rem 0;
+  color: #425a73;
+}
+
+.timeline small {
+  color: #7088a0;
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.8rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.field span {
+  color: #21415f;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.input {
+  border: 1px solid #cbd8e6;
+  border-radius: 0.8rem;
+  padding: 0.7rem 0.8rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.muted {
+  margin: 0;
+  color: #5c738c;
+}
+
+.skeleton {
+  border-radius: 1rem;
+  height: 280px;
+  background: linear-gradient(90deg, #eef3f8 25%, #f8fbfe 37%, #eef3f8 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.2s infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

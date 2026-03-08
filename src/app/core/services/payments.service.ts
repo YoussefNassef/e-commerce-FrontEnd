@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, map } from 'rxjs/operators';
+import { throwError } from 'rxjs';
 import { environment } from '../models/environment';
 import { PaymentResult } from '../models/api.models';
 
@@ -17,26 +18,32 @@ export interface CreatePaymentPayload {
 export class PaymentsService {
   private readonly http = inject(HttpClient);
   private readonly api = environment.apiBaseUrl;
+  private readonly idempotencyByOrder = new Map<string, string>();
 
   createPayment(payload: CreatePaymentPayload) {
-    const idempotencyKey = this.buildIdempotencyKey(payload.orderId);
+    const idempotencyKey = this.getOrCreateIdempotencyKey(payload.orderId);
     return this.http
-      .post<unknown>(`${this.api}/payments/create`, payload, {
+      .post<unknown>(`${this.api}/payments/moyasar`, payload, {
         headers: {
           'idempotency-key': idempotencyKey
         }
       })
       .pipe(
         map((response) => this.normalizePaymentResponse(response)),
-        catchError(() =>
-          this.http
-            .post<unknown>(`${this.api}/payments/moyasar`, payload, {
+        catchError((error) => {
+          if (error?.status !== 404) {
+            return throwError(() => error);
+          }
+
+          // Legacy fallback for older backend builds that still expose /payments/create.
+          return this.http
+            .post<unknown>(`${this.api}/payments/create`, payload, {
               headers: {
                 'idempotency-key': idempotencyKey
               }
             })
-            .pipe(map((response) => this.normalizePaymentResponse(response)))
-        )
+            .pipe(map((response) => this.normalizePaymentResponse(response)));
+        })
       );
   }
 
@@ -181,6 +188,17 @@ export class PaymentsService {
     const stamp = Date.now().toString(36);
     const rand = Math.random().toString(36).slice(2, 8);
     return `checkout-${shortOrder}-${stamp}-${rand}`;
+  }
+
+  private getOrCreateIdempotencyKey(orderId: string): string {
+    const existing = this.idempotencyByOrder.get(orderId);
+    if (existing) {
+      return existing;
+    }
+
+    const created = this.buildIdempotencyKey(orderId);
+    this.idempotencyByOrder.set(orderId, created);
+    return created;
   }
 
 }

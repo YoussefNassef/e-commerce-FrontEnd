@@ -1,0 +1,118 @@
+<section class="returns-shell" dir="rtl">
+  <header class="head">
+    <h1>إدارة الإرجاع والاسترجاع المالي</h1>
+    <p>تابع طلبات RMA وحدّث الحالة وفق التسلسل المسموح.</p>
+  </header>
+
+  @if (toast()) {
+    <div class="banner ok">{{ toast() }}</div>
+  }
+  @if (error()) {
+    <div class="banner err">{{ error() }}</div>
+  }
+
+  <app-card>
+    <div class="toolbar">
+      <label>
+        <span>فلترة حسب الحالة</span>
+        <select [value]="filterStatus()" class="input" (change)="onFilterChange($any($event.target).value)">
+          <option value="">الكل</option>
+          @for (status of statusOptions; track status) {
+            <option [value]="status">{{ statusLabel(status) }}</option>
+          }
+        </select>
+      </label>
+      <app-button variant="secondary" [disabled]="loading()" (pressed)="load()">
+        @if (loading()) { جاري التحميل... } @else { تحديث }
+      </app-button>
+    </div>
+  </app-card>
+
+  <div class="layout">
+    <app-card>
+      @if (loading()) {
+        <div class="skeleton"></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>المعرف</th>
+                <th>رقم الطلب</th>
+                <th>المستخدم</th>
+                <th>السبب</th>
+                <th>الحالة</th>
+                <th>المبلغ</th>
+                <th>التاريخ</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of requests(); track item.id) {
+                <tr (click)="openDetails(item)" class="click-row">
+                  <td>#{{ item.id }}</td>
+                  <td>{{ item.orderId }}</td>
+                  <td>{{ item.userId }}</td>
+                  <td>{{ reasonLabel(item.reason) }}</td>
+                  <td>
+                    <span class="badge" [class]="statusTone(item.status)">
+                      {{ statusLabel(item.status) }}
+                    </span>
+                  </td>
+                  <td>{{ item.refundAmount | currency: 'SAR' }}</td>
+                  <td>{{ item.createdAt | date: 'short' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </app-card>
+
+    @if (selected()) {
+      <app-card class="drawer">
+        <header class="drawer-head">
+          <h2>تفاصيل طلب الإرجاع</h2>
+          <app-button size="sm" variant="ghost" (pressed)="closeDetails()">إغلاق</app-button>
+        </header>
+
+        <div class="timeline">
+          <p><small>تمت الموافقة:</small> {{ selected()!.approvedAt ? (selected()!.approvedAt | date: 'medium') : '-' }}</p>
+          <p><small>تم الرفض:</small> {{ selected()!.rejectedAt ? (selected()!.rejectedAt | date: 'medium') : '-' }}</p>
+          <p><small>بدأ الاسترجاع:</small> {{ selected()!.refundInitiatedAt ? (selected()!.refundInitiatedAt | date: 'medium') : '-' }}</p>
+          <p><small>تم الاسترجاع:</small> {{ selected()!.refundedAt ? (selected()!.refundedAt | date: 'medium') : '-' }}</p>
+          <p><small>تم الإلغاء:</small> {{ selected()!.cancelledAt ? (selected()!.cancelledAt | date: 'medium') : '-' }}</p>
+        </div>
+
+        <form class="form-grid" [formGroup]="form" (ngSubmit)="saveStatus()">
+          <label class="field">
+            <span>الحالة التالية</span>
+            <select formControlName="status" class="input">
+              <option value="" disabled>اختر الحالة</option>
+              @for (status of allowedStatuses(); track status) {
+                <option [value]="status">{{ statusLabel(status) }}</option>
+              }
+            </select>
+          </label>
+
+          @if (allowedStatuses().length === 0) {
+            <p class="muted">هذه الحالة نهائية ولا يوجد انتقالات متاحة.</p>
+          }
+
+          <label class="field">
+            <span>ملاحظة الإدارة (اختياري)</span>
+            <textarea formControlName="adminNote" rows="3" class="input"></textarea>
+          </label>
+
+          <label class="field">
+            <span>مبلغ الاسترجاع (اختياري)</span>
+            <input formControlName="refundAmount" type="number" min="0" step="0.01" class="input" />
+          </label>
+
+          <app-button type="submit" [disabled]="saving() || allowedStatuses().length === 0">
+            @if (saving()) { جاري الحفظ... } @else { حفظ التحديث }
+          </app-button>
+        </form>
+      </app-card>
+    }
+  </div>
+</section>

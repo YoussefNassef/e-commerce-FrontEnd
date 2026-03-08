@@ -161,6 +161,11 @@
             <small class="text-sm text-slate-500">أنشئ الطلب أولًا لتفعيل الدفع.</small>
           } @else {
             <app-button type="button" variant="secondary" (pressed)="refreshOrderStatus()">تحديث حالة الدفع</app-button>
+            @if (canCancelUnpaidOrder()) {
+              <app-button type="button" variant="danger" [disabled]="paying()" (pressed)="cancelUnpaidOrder()">
+                إلغاء الطلب غير المدفوع
+              </app-button>
+            }
           }
         </form>
       </app-card>

@@ -10,6 +10,12 @@
     </div>
   }
 
+  @if (paymentNotice()) {
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-base font-medium text-emerald-800">
+      {{ paymentNotice() }}
+    </div>
+  }
+
   @if (loading()) {
     <app-loading-spinner label="جاري تحميل الطلبات..." />
   } @else if (orders().length === 0) {
@@ -36,6 +42,26 @@
             }
           </ul>
           <div class="mt-4 grid gap-3">
+            @if (canResumePayment(order)) {
+              <app-button (pressed)="continuePayment(order.id)">
+                إكمال الدفع
+              </app-button>
+            }
+            @if (canCancelInitialOrder(order)) {
+              <app-button
+                variant="danger"
+                [disabled]="cancellingOrderId() === order.id"
+                (pressed)="cancelOrder(order)"
+              >
+                @if (cancellingOrderId() === order.id) { جاري الإلغاء... } @else { إلغاء الطلب }
+              </app-button>
+            }
+            <a
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700"
+              [routerLink]="['/orders', order.id, 'tracking']"
+            >
+              صفحة تتبع الشحنة
+            </a>
             <app-button
               variant="secondary"
               [disabled]="loadingTrackingOrderId() === order.id"

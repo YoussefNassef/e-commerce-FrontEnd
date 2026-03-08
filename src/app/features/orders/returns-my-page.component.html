@@ -1,0 +1,64 @@
+<section class="returns-shell" dir="rtl">
+  <header class="head">
+    <h1>طلبات الإرجاع الخاصة بي</h1>
+    <p>تابع حالة الطلب، الملاحظات الإدارية، ومبالغ الاسترجاع.</p>
+    <div class="head-actions">
+      <a routerLink="/returns/new" class="new-link">طلب إرجاع جديد</a>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="banner err">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="skeleton-grid">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+  } @else if (requests().length === 0) {
+    <app-state-panel title="لا توجد طلبات إرجاع" message="عند تقديم طلب إرجاع سيظهر هنا.">
+      <app-button variant="secondary" (pressed)="load()">إعادة المحاولة</app-button>
+    </app-state-panel>
+  } @else {
+    <div class="grid-list">
+      @for (request of requests(); track request.id) {
+        <app-card>
+          <header class="row-head">
+            <strong>#{{ request.id }}</strong>
+            <span class="badge" [class]="statusTone(request.status)">
+              {{ statusLabel(request.status) }}
+            </span>
+          </header>
+
+          <div class="info-grid">
+            <p><small>رقم الطلب:</small> <strong>{{ request.orderId }}</strong></p>
+            <p><small>السبب:</small> <strong>{{ reasonLabel(request.reason) }}</strong></p>
+            <p><small>المبلغ:</small> <strong>{{ request.refundAmount | currency: 'SAR' }}</strong></p>
+            <p><small>تاريخ الإنشاء:</small> <strong>{{ request.createdAt | date: 'medium' }}</strong></p>
+          </div>
+
+          @if (request.reasonDetails) {
+            <p class="note">تفاصيل السبب: {{ request.reasonDetails }}</p>
+          }
+          @if (request.adminNote) {
+            <p class="note">ملاحظة الإدارة: {{ request.adminNote }}</p>
+          }
+
+          @if (canCancel(request.status)) {
+            <div class="actions">
+              <app-button
+                variant="danger"
+                [disabled]="cancellingId() === request.id"
+                (pressed)="cancelRequest(request)"
+              >
+                @if (cancellingId() === request.id) { جاري الإلغاء... } @else { إلغاء طلب الإرجاع }
+              </app-button>
+            </div>
+          }
+        </app-card>
+      }
+    </div>
+  }
+</section>

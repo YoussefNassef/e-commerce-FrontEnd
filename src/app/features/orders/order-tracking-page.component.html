@@ -1,0 +1,92 @@
+<section class="tracking-shell" dir="rtl">
+  <header class="tracking-header">
+    <p class="eyebrow">تتبع الطلب</p>
+    <h1>تتبع الشحنة</h1>
+    <p class="muted">تابع حالة شحنتك وتفاصيل التتبع خطوة بخطوة.</p>
+  </header>
+
+  @if (loading()) {
+    <div class="skeleton-grid">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card tall"></div>
+    </div>
+  } @else if (error()) {
+    <app-state-panel title="تعذر تحميل التتبع" [message]="error()">
+      <div class="actions">
+        <app-button variant="secondary" (pressed)="load()">إعادة المحاولة</app-button>
+        <a routerLink="/orders" class="plain-link">العودة لطلباتي</a>
+      </div>
+    </app-state-panel>
+  } @else if (tracking()) {
+    <app-card>
+      <header class="meta-head">
+        <div>
+          <p class="muted">رقم الطلب</p>
+          <strong>#{{ tracking()!.orderId }}</strong>
+        </div>
+        <span class="status-badge">{{ statusLabel(tracking()!.deliveryStatus) }}</span>
+      </header>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <small>رقم التتبع</small>
+          <strong>{{ tracking()!.trackingNumber || 'غير متوفر' }}</strong>
+        </div>
+        <div class="meta-item">
+          <small>شركة الشحن</small>
+          <strong>{{ tracking()!.shippingCarrier || 'غير متوفر' }}</strong>
+        </div>
+        <div class="meta-item">
+          <small>الموقع الحالي</small>
+          <strong>{{ tracking()!.currentLocation || 'غير متوفر' }}</strong>
+        </div>
+        <div class="meta-item">
+          <small>موعد التسليم المتوقع</small>
+          <strong>{{ tracking()!.estimatedDeliveryAt ? (tracking()!.estimatedDeliveryAt | date: 'medium') : 'غير متوفر' }}</strong>
+        </div>
+      </div>
+
+      @if (tracking()!.trackingNote) {
+        <p class="note">{{ tracking()!.trackingNote }}</p>
+      }
+
+      @if (tracking()!.trackingUrl) {
+        <div class="actions">
+          <a class="cta" [href]="tracking()!.trackingUrl!" target="_blank" rel="noopener noreferrer">
+            تتبع الشحنة
+          </a>
+        </div>
+      }
+    </app-card>
+
+    <app-card>
+      <header class="timeline-head">
+        <h2>الخط الزمني للشحنة</h2>
+      </header>
+
+      @if (timeline().length === 0) {
+        <p class="muted">لا توجد تحديثات تتبع بعد</p>
+      } @else {
+        <div class="timeline">
+          @for (event of timeline(); track event.id) {
+            <article class="timeline-item">
+              <span class="dot"></span>
+              <div class="content">
+                <header>
+                  <strong>{{ statusLabel(event.deliveryStatus) }}</strong>
+                  <small>{{ event.eventAt | date: 'medium' }}</small>
+                </header>
+                <p class="muted">
+                  {{ event.currentLocation || event.trackingNote || 'تم تحديث حالة الشحنة.' }}
+                </p>
+                @if (event.trackingNumber) {
+                  <small class="subtle">رقم التتبع: {{ event.trackingNumber }}</small>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </app-card>
+  }
+</section>

@@ -1,0 +1,151 @@
+:host {
+  display: block;
+}
+
+.returns-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.head h1 {
+  margin: 0;
+  color: #0f2746;
+}
+
+.head p {
+  margin: 0.35rem 0 0;
+  color: #607991;
+}
+
+.picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.helper {
+  margin: 0;
+  color: #5f7891;
+}
+
+.order-picker-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.order-chip {
+  border: 1px solid #dce9f4;
+  border-radius: 0.8rem;
+  padding: 0.7rem;
+  background: #fbfdff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.order-chip strong {
+  display: block;
+  color: #10263d;
+  line-height: 1.4;
+}
+
+.order-chip small {
+  display: block;
+  color: #6a8298;
+  line-height: 1.4;
+}
+
+.order-chip.selected {
+  border-color: #8ed9df;
+  background: #f3fcfd;
+}
+
+.order-skeleton-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.order-skeleton {
+  border-radius: 0.8rem;
+  height: 66px;
+  background: linear-gradient(90deg, #eef3f8 25%, #f8fbfe 37%, #eef3f8 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.2s infinite;
+}
+
+.banner {
+  padding: 0.8rem 0.95rem;
+  border-radius: 0.9rem;
+  font-weight: 700;
+}
+
+.banner.ok {
+  border: 1px solid #b8ebd7;
+  background: #edfcf5;
+  color: #0e6a4e;
+}
+
+.banner.err {
+  border: 1px solid #ffc7d1;
+  background: #fff2f5;
+  color: #a61d43;
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.field span {
+  color: #21415f;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.input {
+  border: 1px solid #cbd8e6;
+  border-radius: 0.8rem;
+  padding: 0.7rem 0.8rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.err-text {
+  color: #b3261e;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.plain-link {
+  color: #0e607a;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .order-chip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

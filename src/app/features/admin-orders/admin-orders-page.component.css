@@ -110,6 +110,13 @@ textarea.input {
   justify-content: flex-start;
 }
 
+.field-error {
+  margin: 0;
+  color: #b3261e;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .side-column {
   display: grid;
   gap: 1rem;

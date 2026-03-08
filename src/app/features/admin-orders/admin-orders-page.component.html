@@ -1,14 +1,16 @@
-<section class="orders-shell">
+<section class="orders-shell" dir="rtl">
   <header class="page-head">
     <div>
       <p class="eyebrow">Admin Tracking</p>
       <h1>إدارة الطلبات والشحن</h1>
-      <p class="lead">استغلال بيانات التتبع الموجودة في الـ API بدل الاقتصار على تغيير الحالة فقط.</p>
+      <p class="lead">تحديث حالة التوصيل وبيانات التتبع مع عرض الخط الزمني الفعلي.</p>
     </div>
   </header>
 
-  @if (notice()) {
-    <div class="banner ok">{{ notice() }}</div>
+  @if (toastMessage()) {
+    <div class="banner" [class.ok]="toastType() === 'success'" [class.err]="toastType() === 'error'">
+      {{ toastMessage() }}
+    </div>
   }
 
   @if (error()) {
@@ -46,7 +48,7 @@
 
         <div class="field-grid">
           <label class="field">
-            <span>رقم التتبع</span>
+            <span>رقم التتبع @if (shouldRequireTrackingNumber()) { * }</span>
             <input formControlName="trackingNumber" type="text" class="input" />
           </label>
 
@@ -55,6 +57,10 @@
             <input formControlName="shippingCarrier" type="text" class="input" />
           </label>
         </div>
+
+        @if (hasTrackingNumberRuleError()) {
+          <p class="field-error">رقم التتبع مطلوب عند اختيار "تم الشحن" أو "خرج للتسليم".</p>
+        }
 
         <div class="field-grid">
           <label class="field">
@@ -74,7 +80,7 @@
         </label>
 
         <div class="actions-row">
-          <app-button type="submit" [disabled]="saving() || form.invalid">
+          <app-button type="submit" [disabled]="saving() || loading()">
             @if (saving()) { جاري الحفظ... } @else { حفظ تحديث التتبع }
           </app-button>
         </div>
@@ -171,39 +177,22 @@
         </div>
       </div>
 
-      <div class="timeline">
-        <div class="timeline-item" [class.active]="true">
-          <span class="timeline-dot"></span>
-          <div>
-            <strong>آخر حالة مسجلة: {{ deliveryStatusLabel(tracking()!.deliveryStatus) }}</strong>
-            <small>{{ tracking()!.deliveryStatusUpdatedAt ? (tracking()!.deliveryStatusUpdatedAt | date: 'medium') : 'لا يوجد وقت مسجل' }}</small>
-          </div>
+      @if (tracking()!.timeline.length === 0) {
+        <p class="empty-copy">لا توجد تحديثات تتبع بعد</p>
+      } @else {
+        <div class="timeline">
+          @for (event of tracking()!.timeline; track event.id) {
+            <div class="timeline-item active">
+              <span class="timeline-dot"></span>
+              <div>
+                <strong>{{ deliveryStatusLabel(event.deliveryStatus) }}</strong>
+                <small>{{ event.eventAt | date: 'medium' }}</small>
+                <p class="tracking-note">{{ event.currentLocation || event.trackingNote || 'تم تحديث حالة الشحنة.' }}</p>
+              </div>
+            </div>
+          }
         </div>
-
-        <div class="timeline-item" [class.active]="!!tracking()!.shippedAt">
-          <span class="timeline-dot"></span>
-          <div>
-            <strong>تم الشحن</strong>
-            <small>{{ tracking()!.shippedAt ? (tracking()!.shippedAt | date: 'medium') : 'لم تُسجل بعد' }}</small>
-          </div>
-        </div>
-
-        <div class="timeline-item" [class.active]="!!tracking()!.outForDeliveryAt">
-          <span class="timeline-dot"></span>
-          <div>
-            <strong>خرج للتسليم</strong>
-            <small>{{ tracking()!.outForDeliveryAt ? (tracking()!.outForDeliveryAt | date: 'medium') : 'لم تُسجل بعد' }}</small>
-          </div>
-        </div>
-
-        <div class="timeline-item" [class.active]="!!tracking()!.deliveredAt">
-          <span class="timeline-dot"></span>
-          <div>
-            <strong>تم التسليم</strong>
-            <small>{{ tracking()!.deliveredAt ? (tracking()!.deliveredAt | date: 'medium') : 'لم تُسجل بعد' }}</small>
-          </div>
-        </div>
-      </div>
+      }
     </app-card>
   }
 </section>
