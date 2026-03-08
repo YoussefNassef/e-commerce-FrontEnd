@@ -1,0 +1,92 @@
+﻿<section class="profile-shell">
+  <header class="profile-hero">
+    <p class="hero-kicker">إدارة الحساب</p>
+    <h1 class="hero-title">تحكم بهويتك</h1>
+    <p class="hero-subtitle">عدّل الاسم ورقم الجوال عبر تدفق آمن من خطوتين.</p>
+
+    <div class="hero-meta">
+      <div class="hero-chip">
+        <span class="chip-label">مسجل باسم</span>
+        <strong>{{ userName() || 'مستخدم' }}</strong>
+      </div>
+      <div class="hero-chip">
+        <span class="chip-label">رقم الجوال الحالي</span>
+        <strong>{{ userPhone() || 'غير محدد' }}</strong>
+      </div>
+    </div>
+  </header>
+
+  @if (notice()) {
+    <div class="notice-banner success">{{ notice() }}</div>
+  }
+
+  @if (error()) {
+    <div class="notice-banner danger">{{ error() }}</div>
+  }
+
+  <div class="profile-grid">
+    <app-card class="profile-panel">
+      <div class="panel-head">
+        <h2>الاسم الشخصي</h2>
+        <span class="panel-tag">مزامنة API</span>
+      </div>
+
+      <form class="form-stack" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+        <label class="field" for="fullName">
+          <span>الاسم الكامل</span>
+          <input id="fullName" type="text" formControlName="fullName" placeholder="اكتب اسمك" />
+          @if (profileForm.controls.fullName.touched && profileForm.controls.fullName.invalid) {
+            <small class="error-text">الاسم مطلوب (حد أدنى حرفان).</small>
+          }
+        </label>
+
+        <app-button type="submit" [disabled]="saving() || profileForm.invalid" [fullWidth]="true">
+          @if (saving()) { جاري الحفظ... } @else { حفظ الاسم }
+        </app-button>
+      </form>
+    </app-card>
+
+    <app-card class="profile-panel">
+      <div class="panel-head">
+        <h2>تغيير رقم الجوال</h2>
+        <span class="panel-tag">OTP</span>
+      </div>
+
+      <div class="flow-track">
+        <div class="flow-step active"><span>1</span> طلب الرمز</div>
+        <div class="flow-line"></div>
+        <div class="flow-step" [class.active]="!!pendingPhone()"><span>2</span> التحقق من الرمز</div>
+      </div>
+
+      <form class="form-stack" [formGroup]="phoneRequestForm" (ngSubmit)="requestPhoneChangeOtp()">
+        <label class="field" for="new-phone">
+          <span>رقم الجوال الجديد</span>
+          <input id="new-phone" type="text" formControlName="phone" placeholder="9665XXXXXXXX" />
+          @if (phoneRequestForm.controls.phone.touched && phoneRequestForm.controls.phone.invalid) {
+            <small class="error-text">رقم الجوال يجب أن يطابق `9665XXXXXXXX`.</small>
+          }
+        </label>
+        <app-button type="submit" [disabled]="requestingPhoneOtp() || phoneRequestForm.invalid" [fullWidth]="true">
+          @if (requestingPhoneOtp()) { جاري إرسال الرمز... } @else { إرسال OTP }
+        </app-button>
+      </form>
+
+      @if (pendingPhone()) {
+        <div class="pending-box">بانتظار التحقق للرقم: <strong>{{ pendingPhone() }}</strong></div>
+      }
+
+      <form class="form-stack mt-4" [formGroup]="phoneVerifyForm" (ngSubmit)="verifyPhoneChangeOtp()">
+        <label class="field" for="phone-code">
+          <span>رمز OTP</span>
+          <input id="phone-code" type="text" formControlName="code" placeholder="رمز من 6 أرقام" />
+          @if (phoneVerifyForm.controls.code.touched && phoneVerifyForm.controls.code.invalid) {
+            <small class="error-text">أدخل رمز OTP صحيحًا من 6 أرقام.</small>
+          }
+        </label>
+        <app-button type="submit" [disabled]="verifyingPhoneOtp() || phoneVerifyForm.invalid || !pendingPhone()" [fullWidth]="true">
+          @if (verifyingPhoneOtp()) { جار التحقق... } @else { تحقق وحدّث الرقم }
+        </app-button>
+      </form>
+    </app-card>
+  </div>
+</section>

@@ -1,0 +1,121 @@
+<section class="space-y-6">
+  <header class="space-y-2">
+    <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">إدارة الكوبونات</h1>
+    <p class="text-sm text-slate-600">إنشاء وإدارة كوبونات الخصم الخاصة بالمتجر.</p>
+  </header>
+
+  @if (notice()) {
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-base font-medium text-emerald-800">
+      {{ notice() }}
+    </div>
+  }
+  @if (error()) {
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-base font-medium text-rose-800">
+      {{ error() }}
+    </div>
+  }
+
+  <app-card>
+    <h2 class="mb-4 text-xl font-semibold text-slate-900">إنشاء كوبون جديد</h2>
+    <form [formGroup]="createForm" (ngSubmit)="createCoupon()" class="grid gap-4 lg:grid-cols-2">
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        الكود
+        <input type="text" formControlName="code" placeholder="SAVE20" class="rounded-xl border border-slate-300 px-4 py-3 text-sm" />
+      </label>
+
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        نوع الخصم
+        <select formControlName="discountType" class="rounded-xl border border-slate-300 px-4 py-3 text-sm">
+          <option value="percentage">نسبة مئوية</option>
+          <option value="fixed">قيمة ثابتة</option>
+        </select>
+      </label>
+
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        قيمة الخصم
+        <input type="number" min="1" formControlName="value" class="rounded-xl border border-slate-300 px-4 py-3 text-sm" />
+      </label>
+
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        الحد الأدنى للطلب
+        <input type="number" min="0" formControlName="minOrderAmount" class="rounded-xl border border-slate-300 px-4 py-3 text-sm" />
+      </label>
+
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        الحد الأقصى للخصم (اختياري)
+        <input type="number" min="0" formControlName="maxDiscount" class="rounded-xl border border-slate-300 px-4 py-3 text-sm" />
+      </label>
+
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        حد الاستخدام (اختياري)
+        <input type="number" min="1" formControlName="usageLimit" class="rounded-xl border border-slate-300 px-4 py-3 text-sm" />
+      </label>
+
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        بداية الصلاحية (اختياري)
+        <input type="datetime-local" formControlName="startsAt" class="rounded-xl border border-slate-300 px-4 py-3 text-sm" />
+      </label>
+
+      <label class="grid gap-2 text-sm font-semibold text-slate-700">
+        نهاية الصلاحية (اختياري)
+        <input type="datetime-local" formControlName="endsAt" class="rounded-xl border border-slate-300 px-4 py-3 text-sm" />
+      </label>
+
+      <label class="flex items-center gap-2 text-sm font-semibold text-slate-700 lg:col-span-2">
+        <input type="checkbox" formControlName="isActive" />
+        الكوبون نشط
+      </label>
+
+      <div class="lg:col-span-2">
+        <app-button type="submit" [disabled]="creating() || createForm.invalid">
+          @if (creating()) { جار الإنشاء... } @else { إنشاء الكوبون }
+        </app-button>
+      </div>
+    </form>
+  </app-card>
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل الكوبونات..." />
+  } @else if (!coupons().length) {
+    <app-state-panel title="لا توجد كوبونات" message="ابدأ بإضافة أول كوبون خصم." />
+  } @else {
+    <div class="grid gap-4">
+      @for (coupon of coupons(); track coupon.id) {
+        <app-card>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="space-y-1">
+              <h3 class="text-xl font-bold text-slate-900">{{ coupon.code }}</h3>
+              <p class="text-sm text-slate-600">
+                النوع: {{ coupon.discountType === 'percentage' ? 'نسبة' : 'ثابت' }} |
+                القيمة: {{ coupon.value }} |
+                مستخدم: {{ coupon.usedCount }}
+              </p>
+              <p class="text-xs text-slate-500">
+                @if (coupon.startsAt) { يبدأ: {{ coupon.startsAt | date: 'medium' }} } @else { بدون بداية } |
+                @if (coupon.endsAt) { ينتهي: {{ coupon.endsAt | date: 'medium' }} } @else { بدون نهاية }
+              </p>
+            </div>
+
+            <div class="grid gap-2 md:grid-cols-2">
+              <app-button
+                variant="secondary"
+                [disabled]="updatingCouponId() === coupon.id"
+                (pressed)="toggleActive(coupon)"
+              >
+                @if (updatingCouponId() === coupon.id) { جار التحديث... } @else if (coupon.isActive) { تعطيل } @else { تفعيل }
+              </app-button>
+              <app-button
+                variant="danger"
+                [disabled]="deletingCouponId() === coupon.id"
+                (pressed)="removeCoupon(coupon)"
+              >
+                @if (deletingCouponId() === coupon.id) { جار الحذف... } @else { حذف }
+              </app-button>
+            </div>
+          </div>
+        </app-card>
+      }
+    </div>
+  }
+</section>
+

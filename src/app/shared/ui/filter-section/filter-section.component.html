@@ -1,0 +1,14 @@
+<section class="ui-filter">
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-slate-900">{{ title }}</h2>
+      @if (subtitle) {
+        <p class="mt-1 text-sm text-slate-600/90">{{ subtitle }}</p>
+      }
+    </div>
+    <ng-content select="[section-actions]" />
+  </div>
+  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <ng-content />
+  </div>
+</section>

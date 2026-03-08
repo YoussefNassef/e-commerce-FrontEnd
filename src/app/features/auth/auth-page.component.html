@@ -1,0 +1,71 @@
+﻿<section class="auth-shell">
+  <div class="auth-card">
+    <p class="auth-kicker">أهلًا بعودتك</p>
+    <h1>دخول المتجر الرقمي</h1>
+    <p class="auth-sub">تسجيل آمن عبر رمز OTP للتسوق وإدارة الحساب.</p>
+
+    <div class="auth-toggle">
+      <button type="button" (click)="setMode('signin')" [class.active]="mode() === 'signin'">تسجيل الدخول</button>
+      <button type="button" (click)="setMode('register')" [class.active]="mode() === 'register'">حساب جديد</button>
+    </div>
+
+    @if (mode() === 'register' && stage() === 'phone') {
+      <form [formGroup]="registerForm" (ngSubmit)="submitRegister()" class="auth-form">
+        <label>
+          <span>الاسم الكامل</span>
+          <input type="text" formControlName="fullName" placeholder="محمد أحمد" />
+        </label>
+        <label>
+          <span>رقم الجوال (9665XXXXXXXX)</span>
+          <input type="text" formControlName="phone" placeholder="966512345678" />
+        </label>
+        <button [disabled]="loading()" type="submit" class="auth-btn">
+          @if (loading()) { جاري المعالجة... } @else { إنشاء الحساب }
+        </button>
+      </form>
+    }
+
+    @if (mode() === 'register' && stage() === 'register-otp') {
+      <form [formGroup]="otpForm" (ngSubmit)="verifyRegisterOtp()" class="auth-form">
+        <label>
+          <span>رمز تفعيل الحساب</span>
+          <input type="text" formControlName="code" placeholder="123456" />
+        </label>
+        <button [disabled]="loading()" type="submit" class="auth-btn">
+          @if (loading()) { جار التفعيل... } @else { تفعيل الحساب }
+        </button>
+      </form>
+    }
+
+    @if (mode() === 'signin' && stage() === 'phone') {
+      <form [formGroup]="signInForm" (ngSubmit)="submitSignIn()" class="auth-form">
+        <label>
+          <span>رقم الجوال (9665XXXXXXXX)</span>
+          <input type="text" formControlName="phone" placeholder="966512345678" />
+        </label>
+        <button [disabled]="loading()" type="submit" class="auth-btn">
+          @if (loading()) { جاري المعالجة... } @else { إرسال الرمز }
+        </button>
+      </form>
+    }
+
+    @if (mode() === 'signin' && stage() === 'otp') {
+      <form [formGroup]="otpForm" (ngSubmit)="verifyOtp()" class="auth-form">
+        <label>
+          <span>رمز OTP</span>
+          <input type="text" formControlName="code" placeholder="123456" />
+        </label>
+        <button [disabled]="loading()" type="submit" class="auth-btn">
+          @if (loading()) { جار التحقق... } @else { تحقق من الرمز }
+        </button>
+      </form>
+    }
+
+    @if (message()) {
+      <div class="auth-alert success">{{ message() }}</div>
+    }
+    @if (error()) {
+      <div class="auth-alert danger">{{ error() }}</div>
+    }
+  </div>
+</section>

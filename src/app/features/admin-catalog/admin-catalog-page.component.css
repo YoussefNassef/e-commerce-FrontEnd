@@ -1,0 +1,45 @@
+﻿:host { display:block; }
+.admin-grid { display:grid; gap:1rem; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); }
+.panel h2 { margin:0; color:#12243a; }
+.input { border:1px solid #cbd8e6; border-radius:0.65rem; padding:0.55rem 0.65rem; }
+.categories-list { display:grid; gap:0.65rem; margin-top:1rem; }
+.category-row { display:grid; grid-template-columns:1fr auto; gap:0.75rem; align-items:center; border:1px solid #e2e8f0; border-radius:0.8rem; padding:0.75rem; }
+.category-row p { margin:0.2rem 0 0; color:#64748b; font-size:0.82rem; }
+.category-actions { display:flex; gap:0.45rem; flex-wrap:wrap; }
+.list-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.list-meta { margin:0.3rem 0 0; color:#64748b; font-size:0.92rem; }
+.list-state { padding:1rem 0; }
+.empty-state { border:1px dashed #cbd5e1; border-radius:0.9rem; color:#64748b; text-align:center; padding:1.25rem; }
+.products-list { display:grid; gap:0.65rem; }
+.item-row { display:grid; grid-template-columns:56px 1fr auto; gap:0.7rem; align-items:center; border:1px solid #e2e8f0; border-radius:0.7rem; padding:0.5rem; }
+.item-row img { width:56px; height:56px; object-fit:cover; border-radius:0.55rem; background:#f1f5f9; }
+.item-row p { margin:0.2rem 0 0; color:#64748b; font-size:0.85rem; }
+.item-actions { display:grid; gap:0.45rem; justify-items:end; min-width:140px; }
+.pagination { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:1rem; flex-wrap:wrap; }
+.page-numbers { display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap; }
+.page-chip {
+  min-width:2.4rem;
+  height:2.4rem;
+  border:1px solid #cbd5e1;
+  border-radius:999px;
+  background:#fff;
+  color:#0f172a;
+  font-weight:700;
+  transition:background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.page-chip.active {
+  background:#0ea5b7;
+  border-color:#0ea5b7;
+  color:#fff;
+}
+.page-chip:disabled {
+  opacity:0.6;
+  cursor:not-allowed;
+}
+
+@media (max-width: 720px) {
+  .category-row { grid-template-columns:1fr; }
+  .item-row { grid-template-columns:56px 1fr; }
+  .item-actions { grid-column:1 / -1; justify-items:stretch; }
+  .pagination { justify-content:center; }
+}

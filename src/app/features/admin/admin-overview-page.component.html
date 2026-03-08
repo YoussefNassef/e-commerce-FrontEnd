@@ -1,0 +1,363 @@
+<section class="admin-shell">
+  <header class="overview-hero">
+    <div class="hero-copy">
+      <span class="eyebrow">Operations Center</span>
+      <h1>ملخص الإدارة</h1>
+      <p>متابعة الإيراد، المدفوعات، المخزون، وحركة الطلبات من شاشة واحدة مبنية على بيانات الـ API الحالية.</p>
+    </div>
+
+    <div class="hero-actions">
+      <div class="sync-chip">
+        <span class="sync-dot"></span>
+        <span>آخر تحديث {{ overview()?.generatedAt | date: 'medium' }}</span>
+      </div>
+
+      <a routerLink="/admin" class="back-link">العودة إلى لوحة الإدارة</a>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="notice err">
+      <span>{{ error() }}</span>
+      <app-button type="button" size="sm" variant="secondary" (pressed)="loadOverview()">إعادة المحاولة</app-button>
+    </div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل إحصائيات الإدارة..." />
+  } @else if (!overview()) {
+    <app-state-panel tone="error" title="تعذر تحميل لوحة الإحصائيات" message="حاول مرة أخرى.">
+      <div class="state-actions">
+        <app-button type="button" (pressed)="loadOverview()">إعادة المحاولة</app-button>
+      </div>
+    </app-state-panel>
+  } @else {
+    <section class="spotlight-grid">
+      <app-card class="spotlight-card revenue-card">
+        <span class="section-kicker">Revenue</span>
+        <h2>الإيراد المكتمل</h2>
+        <strong class="amount spotlight-value">{{ overview()!.kpis.completedRevenue | currency: 'SAR' }}</strong>
+        <div class="spotlight-meta">
+          <span>تحصيل فعلي {{ revenueCaptureRate(overview()!.kpis) }}%</span>
+          <span>اليوم {{ overview()!.kpis.todayRevenue | currency: 'SAR' }}</span>
+        </div>
+      </app-card>
+
+      <app-card class="spotlight-card ops-card">
+        <span class="section-kicker">Operations</span>
+        <h2>الطلبات النشطة الآن</h2>
+        <strong class="spotlight-value">{{ overview()!.kpis.inProgressOrders + overview()!.kpis.pendingPaymentOrders }}</strong>
+        <div class="spotlight-meta">
+          <span>{{ activeOrderLoad(overview()!.kpis) }}% من إجمالي الطلبات</span>
+          <span>{{ overview()!.kpis.completedOrders }} طلبات مكتملة</span>
+        </div>
+      </app-card>
+
+      <app-card class="spotlight-card risk-card">
+        <span class="section-kicker">Attention</span>
+        <h2>عناصر تحتاج تدخل</h2>
+        <strong class="spotlight-value">{{ overview()!.inventorySummary.outOfStockProducts + overview()!.kpis.pendingPaymentOrders }}</strong>
+        <div class="spotlight-meta">
+          <span>{{ overview()!.inventorySummary.outOfStockProducts }} نفاد مخزون</span>
+          <span>{{ overview()!.kpis.pendingPaymentOrders }} دفعات معلقة</span>
+        </div>
+      </app-card>
+    </section>
+
+    <section class="kpi-grid">
+      <app-card class="metric-card">
+        <span class="metric-label">إجمالي الطلبات</span>
+        <strong class="metric-value">{{ overview()!.kpis.totalOrders }}</strong>
+        <span class="metric-note">{{ completionRate(overview()!.kpis) }}% مكتمل</span>
+      </app-card>
+
+      <app-card class="metric-card">
+        <span class="metric-label">المنتجات النشطة</span>
+        <strong class="metric-value">{{ overview()!.kpis.activeProducts }}</strong>
+        <span class="metric-note">من أصل {{ overview()!.kpis.totalProducts }} منتج</span>
+      </app-card>
+
+      <app-card class="metric-card">
+        <span class="metric-label">صحة المخزون</span>
+        <strong class="metric-value">{{ inventoryHealth(overview()!.inventorySummary) }}%</strong>
+        <span class="metric-note">{{ overview()!.inventorySummary.lowStockProducts }} منتجات منخفضة</span>
+      </app-card>
+
+      <app-card class="metric-card">
+        <span class="metric-label">متوسط قيمة الطلب</span>
+        <strong class="amount metric-value">{{ averageOrderValue(overview()!.kpis) | currency: 'SAR' }}</strong>
+        <span class="metric-note">{{ overview()!.kpis.paidOrdersInRange }} طلبات مدفوعة في آخر {{ overview()!.rangeDays }} أيام</span>
+      </app-card>
+
+      <app-card class="metric-card">
+        <span class="metric-label">الحسابات المسجلة</span>
+        <strong class="metric-value">{{ overview()!.kpis.totalUsers }}</strong>
+        <span class="metric-note">قاعدة العملاء الحالية</span>
+      </app-card>
+    </section>
+
+    <section class="insight-grid">
+      <app-card class="panel-card action-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Priorities</span>
+            <h2>أولويات التشغيل</h2>
+          </div>
+        </div>
+
+        <div class="priority-list">
+          <div class="priority-item danger">
+            <span class="priority-count">{{ overview()!.kpis.pendingPaymentOrders }}</span>
+            <div>
+              <strong>دفعات قيد الانتظار</strong>
+              <p>طلبات بدأت الدفع ولم تغلق بعد وتحتاج متابعة من الفريق.</p>
+            </div>
+          </div>
+
+          <div class="priority-item warn">
+            <span class="priority-count">{{ overview()!.inventorySummary.lowStockProducts }}</span>
+            <div>
+              <strong>منتجات بمخزون منخفض</strong>
+              <p>هذه المنتجات قريبة من نفاد المخزون وقد تؤثر على الطلبات القادمة.</p>
+            </div>
+          </div>
+
+          <div class="priority-item calm">
+            <span class="priority-count">{{ overview()!.kpis.completedOrders }}</span>
+            <div>
+              <strong>طلبات أغلقت بنجاح</strong>
+              <p>مؤشر جيد على استقرار التنفيذ خلال النطاق الزمني الحالي.</p>
+            </div>
+          </div>
+        </div>
+      </app-card>
+
+      <app-card class="panel-card action-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Visual KPIs</span>
+            <h2>دوائر الأداء السريع</h2>
+          </div>
+        </div>
+
+        <div class="ring-grid">
+          <div class="ring-metric">
+            <div class="ring-visual aqua" [style.--value]="completionRate(overview()!.kpis) + '%'">
+              <span>{{ completionRate(overview()!.kpis) }}%</span>
+            </div>
+            <strong>إغلاق الطلبات</strong>
+            <small>{{ overview()!.kpis.completedOrders }} من {{ overview()!.kpis.totalOrders }} طلب</small>
+          </div>
+
+          <div class="ring-metric">
+            <div class="ring-visual amber" [style.--value]="inventoryCoverage(overview()!.kpis) + '%'">
+              <span>{{ inventoryCoverage(overview()!.kpis) }}%</span>
+            </div>
+            <strong>سلامة المخزون</strong>
+            <small>{{ overview()!.kpis.lowStockProducts }} منتجات منخفضة</small>
+          </div>
+
+          <div class="ring-metric">
+            <div class="ring-visual emerald" [style.--value]="revenueCaptureRate(overview()!.kpis) + '%'">
+              <span>{{ revenueCaptureRate(overview()!.kpis) }}%</span>
+            </div>
+            <strong>تحصيل الإيراد</strong>
+            <small class="amount">{{ overview()!.kpis.completedRevenue | currency: 'SAR' }}</small>
+          </div>
+
+          <div class="ring-metric">
+            <div class="ring-visual rose" [style.--value]="deliverySuccessRate(overview()!.deliveryStatusCounts, overview()!.kpis.totalOrders) + '%'">
+              <span>{{ deliverySuccessRate(overview()!.deliveryStatusCounts, overview()!.kpis.totalOrders) }}%</span>
+            </div>
+            <strong>نجاح التوصيل</strong>
+            <small>{{ overview()!.deliveryStatusCounts.length }} حالات تتبع</small>
+          </div>
+        </div>
+      </app-card>
+    </section>
+
+    <section class="dashboard-grid">
+      <app-card class="panel-card chart-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Sales</span>
+            <h2>أداء آخر {{ overview()!.rangeDays || 7 }} أيام</h2>
+          </div>
+          <strong class="amount panel-highlight">{{ overview()!.kpis.todayRevenue | currency: 'SAR' }}</strong>
+        </div>
+
+        <div class="sales-chart">
+          @for (row of overview()!.salesLast7Days; track row.date) {
+            <div class="chart-day">
+              <div class="chart-column-wrap">
+                <span class="chart-column" [style.height]="salesColumnHeight(row.revenue, maxRevenue(overview()!.salesLast7Days))"></span>
+              </div>
+              <strong class="amount">{{ row.revenue | currency: 'SAR' }}</strong>
+              <small>{{ row.totalOrders }} طلب</small>
+              <span>{{ row.date }}</span>
+            </div>
+          }
+        </div>
+      </app-card>
+
+      <app-card class="panel-card">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Orders</span>
+            <h2>حالات الطلبات</h2>
+          </div>
+          <strong class="panel-highlight">{{ overview()!.kpis.totalOrders }}</strong>
+        </div>
+
+        <div class="status-stack">
+          @for (row of overview()!.orderStatusCounts; track row.status) {
+            <div class="status-row">
+              <div class="status-copy">
+                <span>{{ orderStatusLabel(row.status) }}</span>
+                <strong>{{ row.count }}</strong>
+              </div>
+              <div class="status-bar">
+                <span [style.width]="statusWidth(row.count, overview()!.kpis.totalOrders)"></span>
+              </div>
+            </div>
+          }
+        </div>
+      </app-card>
+
+      <app-card class="panel-card">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Delivery</span>
+            <h2>حالات التوصيل</h2>
+          </div>
+          <strong class="panel-highlight">{{ overview()!.deliveryStatusCounts.length }}</strong>
+        </div>
+
+        <div class="status-stack">
+          @for (row of overview()!.deliveryStatusCounts; track row.status) {
+            <div class="status-row">
+              <div class="status-copy">
+                <span>{{ deliveryStatusLabel(row.status) }}</span>
+                <strong>{{ row.count }}</strong>
+              </div>
+              <div class="status-bar warm">
+                <span [style.width]="statusWidth(row.count, overview()!.kpis.totalOrders)"></span>
+              </div>
+            </div>
+          }
+        </div>
+      </app-card>
+
+      <app-card class="panel-card">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Payments</span>
+            <h2>تدفق المدفوعات</h2>
+          </div>
+          <strong class="panel-highlight">{{ paymentTotalCount(overview()!.paymentStatusCounts) }}</strong>
+        </div>
+
+        <div class="status-stack">
+          @for (row of overview()!.paymentStatusCounts; track row.status) {
+            <div class="status-row">
+              <div class="status-copy">
+                <span>{{ paymentStatusLabel(row.status) }}</span>
+                <strong>{{ row.count }}</strong>
+              </div>
+              <div class="status-bar cool">
+                <span [style.width]="statusWidth(row.count, paymentTotalCount(overview()!.paymentStatusCounts))"></span>
+              </div>
+              <small class="inline-note amount">{{ row.amount | currency: 'SAR' }}</small>
+            </div>
+          }
+        </div>
+      </app-card>
+
+      <app-card class="panel-card">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Inventory</span>
+            <h2>ملخص المخزون</h2>
+          </div>
+          <strong class="panel-highlight">{{ inventoryUtilization(overview()!.inventorySummary) }}%</strong>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-tile">
+            <span>إجمالي المنتجات</span>
+            <strong>{{ overview()!.inventorySummary.totalProducts }}</strong>
+          </div>
+          <div class="summary-tile">
+            <span>نفد المخزون</span>
+            <strong>{{ overview()!.inventorySummary.outOfStockProducts }}</strong>
+          </div>
+          <div class="summary-tile">
+            <span>وحدات محجوزة</span>
+            <strong>{{ overview()!.inventorySummary.totalReservedUnits }}</strong>
+          </div>
+          <div class="summary-tile">
+            <span>وحدات متاحة</span>
+            <strong>{{ overview()!.inventorySummary.totalAvailableUnits }}</strong>
+          </div>
+        </div>
+      </app-card>
+
+      <app-card class="panel-card recent-card">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Top Products</span>
+            <h2>أفضل المنتجات</h2>
+          </div>
+          <strong class="panel-highlight">{{ overview()!.topProducts.length }}</strong>
+        </div>
+
+        <div class="top-products">
+          @for (product of overview()!.topProducts; track product.productId) {
+            <div class="order-row compact-row">
+              <div class="order-copy">
+                <strong>{{ product.name }}</strong>
+                <small>{{ product.sku }}</small>
+              </div>
+
+              <div class="order-meta">
+                <span>{{ product.quantitySold }} مباعة</span>
+                <span>المخزون {{ product.stock }}</span>
+                <strong class="amount">{{ product.revenue | currency: 'SAR' }}</strong>
+              </div>
+            </div>
+          }
+        </div>
+      </app-card>
+
+      <app-card class="panel-card recent-card">
+        <div class="panel-head">
+          <div>
+            <span class="section-kicker">Recent Orders</span>
+            <h2>آخر الطلبات</h2>
+          </div>
+          <strong class="panel-highlight">{{ overview()!.recentOrders.length }}</strong>
+        </div>
+
+        <div class="recent-orders">
+          @for (order of overview()!.recentOrders; track order.id) {
+            <div class="order-row">
+              <div class="order-copy">
+                <div class="order-title">
+                  <strong>#{{ order.id }}</strong>
+                  <span>{{ order.userName }}</span>
+                </div>
+                <small>{{ order.createdAt | date: 'medium' }}</small>
+              </div>
+
+              <div class="order-meta">
+                <span class="status-pill">{{ orderStatusLabel(order.status) }}</span>
+                <span class="status-pill muted">{{ deliveryStatusLabel(order.deliveryStatus) }}</span>
+                <strong class="amount">{{ order.totalAmount | currency: 'SAR' }}</strong>
+              </div>
+            </div>
+          }
+        </div>
+      </app-card>
+    </section>
+  }
+</section>

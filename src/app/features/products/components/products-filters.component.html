@@ -1,0 +1,64 @@
+<section class="filters-shell">
+  <label>
+    بحث
+    <input
+      type="search"
+      [value]="search"
+      [disabled]="loading"
+      (input)="searchChanged.emit($any($event.target).value)"
+      placeholder="ابحث بالاسم أو SKU أو الوصف..."
+    />
+  </label>
+
+  <label>
+    التصنيف
+    <select [value]="selectedCategory" [disabled]="loading" (change)="categoryChanged.emit($any($event.target).value)">
+      <option value="">كل التصنيفات</option>
+      @for (category of categories; track category.id) {
+        <option [value]="category.slug ? ('slug:' + category.slug) : ('id:' + category.id)">
+          {{ category.name }}
+        </option>
+      }
+    </select>
+  </label>
+
+  <label>
+    أقل سعر
+    <select [value]="minPrice != null ? '' + minPrice : ''" [disabled]="loading" (change)="minPriceChanged.emit($any($event.target).value)">
+      @for (option of minPriceOptions(); track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    أعلى سعر
+    <select [value]="maxPrice != null ? '' + maxPrice : ''" [disabled]="loading" (change)="maxPriceChanged.emit($any($event.target).value)">
+      @for (option of maxPriceOptions(); track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    الحالة
+    <select [value]="isActive" [disabled]="loading" (change)="isActiveChanged.emit($any($event.target).value)">
+      <option value="all">الكل</option>
+      <option value="true">نشط فقط</option>
+      <option value="false">غير نشط فقط</option>
+    </select>
+  </label>
+
+  <label class="toggle-row">
+    <input type="checkbox" [checked]="inStockOnly" [disabled]="loading" (change)="inStockChanged.emit($any($event.target).checked)" />
+    <span>متوفر بالمخزون فقط</span>
+  </label>
+
+  <div class="actions">
+    <app-button type="button" variant="secondary" [disabled]="loading" (pressed)="resetPressed.emit()">إعادة ضبط</app-button>
+  </div>
+
+  @if (minMaxError) {
+    <p class="validation">{{ minMaxError }}</p>
+  }
+</section>

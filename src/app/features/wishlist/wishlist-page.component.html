@@ -1,0 +1,69 @@
+<section class="space-y-6">
+  <header class="space-y-2">
+    <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">المفضلة</h1>
+    <p class="text-sm text-slate-600">احفظ المنتجات التي تريد الرجوع لها أو انقلها مباشرة إلى السلة.</p>
+  </header>
+
+  @if (notice()) {
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-base font-medium text-emerald-800">
+      {{ notice() }}
+    </div>
+  }
+  @if (error()) {
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-base font-medium text-rose-800">
+      {{ error() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل المفضلة..." />
+  } @else if (!wishlist().length) {
+    <app-state-panel title="لا توجد منتجات في المفضلة" message="ابدأ بحفظ المنتجات من صفحة المنتجات أو تفاصيل المنتج.">
+      <div class="mt-4">
+        <a routerLink="/products" class="font-semibold text-teal-700 underline underline-offset-2">تصفح المنتجات</a>
+      </div>
+    </app-state-panel>
+  } @else {
+    <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
+      عدد المنتجات في المفضلة: <strong class="text-slate-900">{{ totalItems() }}</strong>
+    </div>
+
+    <div class="grid gap-4">
+      @for (item of wishlist(); track item.id) {
+        <app-card>
+          <div class="grid gap-4 md:grid-cols-[130px_1fr_auto] md:items-center">
+            <img [src]="item.product.mainPicture" [alt]="item.product.name" class="h-32 w-32 rounded-xl object-cover" />
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <h3 class="text-xl font-semibold text-slate-900">{{ item.product.name }}</h3>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  {{ categoryLabel(item.product.category) }}
+                </span>
+              </div>
+              <p class="text-base text-slate-600">{{ item.product.description || 'لا يوجد وصف متاح.' }}</p>
+              <p class="text-base text-slate-700">السعر: <strong class="text-slate-900">{{ item.product.price | currency: 'SAR' }}</strong></p>
+              <p class="text-xs text-slate-500">أُضيفت في {{ item.createdAt | date: 'medium' }}</p>
+            </div>
+            <div class="grid gap-2 md:justify-items-end">
+              <a [routerLink]="['/products', item.product.id]" class="text-sm font-semibold text-blue-700 underline underline-offset-2">عرض التفاصيل</a>
+              <app-button
+                [disabled]="movingProductId() === item.product.id"
+                (pressed)="moveToCart(item.product.id)"
+              >
+                @if (movingProductId() === item.product.id) { جار النقل... } @else { نقل إلى السلة }
+              </app-button>
+              <app-button
+                variant="secondary"
+                [disabled]="removingProductId() === item.product.id"
+                (pressed)="remove(item.product.id)"
+              >
+                @if (removingProductId() === item.product.id) { جار الإزالة... } @else { إزالة من المفضلة }
+              </app-button>
+            </div>
+          </div>
+        </app-card>
+      }
+    </div>
+  }
+</section>
+

@@ -1,0 +1,232 @@
+:host {
+  display: block;
+}
+
+.profile-shell {
+  margin: 0 auto;
+  max-width: 1150px;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.profile-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 1.5rem;
+  background:
+    radial-gradient(90rem 20rem at 15% -5%, rgba(34, 211, 238, 0.25), transparent 35%),
+    radial-gradient(80rem 22rem at 80% 120%, rgba(14, 165, 233, 0.2), transparent 38%),
+    linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #0b3a53 100%);
+  color: #f8fafc;
+  animation: heroFloat 5s ease-in-out infinite;
+}
+
+.hero-kicker {
+  margin: 0;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  color: #a5f3fc;
+  font-weight: 700;
+}
+
+.hero-title {
+  margin: 0.4rem 0 0;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 800;
+}
+
+.hero-subtitle {
+  margin: 0.8rem 0 0;
+  max-width: 42rem;
+  font-size: 0.98rem;
+  color: #cbd5e1;
+}
+
+.hero-meta {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.hero-chip {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.35);
+  padding: 0.7rem 0.9rem;
+  backdrop-filter: blur(6px);
+  display: grid;
+  gap: 0.12rem;
+}
+
+.chip-label {
+  color: #a5f3fc;
+  font-size: 0.72rem;
+}
+
+.notice-banner {
+  border-radius: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+}
+
+.notice-banner.success {
+  background: #ecfdf3;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.notice-banner.danger {
+  background: #fff1f2;
+  color: #9f1239;
+  border-color: #fda4af;
+}
+
+.profile-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.profile-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(125, 211, 252, 0.1), transparent 40%);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.panel-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.panel-tag {
+  border: 1px solid #bae6fd;
+  background: #f0f9ff;
+  color: #0c4a6e;
+  border-radius: 999px;
+  padding: 0.2rem 0.62rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.form-stack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field > span {
+  font-size: 0.82rem;
+  color: #334155;
+  font-weight: 700;
+}
+
+.field input {
+  border-radius: 0.85rem;
+  border: 1px solid #cbd5e1;
+  padding: 0.72rem 0.9rem;
+  background: #fff;
+  color: #0f172a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.32);
+  transform: translateY(-1px);
+}
+
+.error-text {
+  color: #be123c;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.flow-track {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+
+.flow-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.flow-step span {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.flow-step.active {
+  color: #0c4a6e;
+}
+
+.flow-step.active span {
+  border-color: #7dd3fc;
+  background: #e0f2fe;
+}
+
+.flow-line {
+  height: 2px;
+  flex: 1;
+  background: linear-gradient(90deg, #7dd3fc, #bae6fd);
+}
+
+.pending-box {
+  margin-top: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px dashed #7dd3fc;
+  background: #ecfeff;
+  color: #0c4a6e;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+@keyframes heroFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}

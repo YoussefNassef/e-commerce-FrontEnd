@@ -1,0 +1,185 @@
+﻿<section class="space-y-6">
+  <header class="space-y-2">
+    <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">إدارة الكتالوج</h1>
+    <p class="text-sm text-slate-600">إضافة التصنيفات والمنتجات من مكان واحد.</p>
+  </header>
+
+  @if (notice()) {
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-base font-medium text-emerald-800">{{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-base font-medium text-rose-800">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل بيانات الإدارة..." />
+  } @else {
+    <div class="admin-grid">
+      <app-card class="panel">
+        <h2>إضافة تصنيف</h2>
+        <form [formGroup]="categoryForm" (ngSubmit)="createCategory()" class="grid gap-3 mt-3">
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            الاسم
+            <input formControlName="name" type="text" placeholder="Smartphones" class="input" />
+          </label>
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            slug (اختياري)
+            <input formControlName="slug" type="text" placeholder="smartphones" class="input" />
+          </label>
+          <app-button type="submit" [disabled]="creatingCategory() || categoryForm.invalid">@if (creatingCategory()) { جاري الإنشاء... } @else { إنشاء تصنيف }</app-button>
+        </form>
+      </app-card>
+
+      <app-card class="panel">
+        <h2>تعديل التصنيفات</h2>
+        <form [formGroup]="categoryEditForm" (ngSubmit)="updateCategory()" class="grid gap-3 mt-3">
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            الاسم
+            <input formControlName="name" type="text" placeholder="اختر من القائمة بالأسفل" class="input" />
+          </label>
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            slug
+            <input formControlName="slug" type="text" class="input" />
+          </label>
+          <app-button type="submit" [disabled]="updatingCategoryId() !== null || !categoryEditForm.controls.id.value || categoryEditForm.invalid">
+            @if (updatingCategoryId()) { جاري التحديث... } @else { تحديث التصنيف }
+          </app-button>
+        </form>
+
+        <div class="categories-list">
+          @for (category of categories(); track category.id) {
+            <div class="category-row">
+              <div>
+                <strong>{{ category.name }}</strong>
+                <p>{{ category.slug || 'بدون slug' }}</p>
+              </div>
+              <div class="category-actions">
+                <app-button type="button" size="sm" variant="secondary" (pressed)="startCategoryEdit(category)">تعديل</app-button>
+                <app-button
+                  type="button"
+                  size="sm"
+                  variant="danger"
+                  [disabled]="deletingCategoryId() === category.id"
+                  (pressed)="deleteCategory(category)"
+                >
+                  @if (deletingCategoryId() === category.id) { جاري الحذف... } @else { حذف }
+                </app-button>
+              </div>
+            </div>
+          }
+        </div>
+      </app-card>
+
+      <app-card class="panel">
+        <h2>إضافة منتج</h2>
+        <form [formGroup]="productForm" (ngSubmit)="createProduct()" class="grid gap-3 mt-3">
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            الاسم
+            <input formControlName="name" type="text" class="input" />
+          </label>
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            الوصف
+            <textarea formControlName="description" rows="3" class="input"></textarea>
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="grid gap-1 text-sm font-semibold text-slate-700">
+              السعر
+              <input formControlName="price" type="number" min="1" class="input" />
+            </label>
+            <label class="grid gap-1 text-sm font-semibold text-slate-700">
+              المخزون
+              <input formControlName="stock" type="number" min="0" class="input" />
+            </label>
+          </div>
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            التصنيف
+            <select formControlName="categoryId" class="input">
+              @for (c of categories(); track c.id) {
+                <option [value]="c.id">{{ c.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            الصورة الرئيسية
+            <input type="file" accept="image/*" (change)="onMainPictureSelected($any($event.target).files)" />
+          </label>
+          <label class="grid gap-1 text-sm font-semibold text-slate-700">
+            صور إضافية (اختياري، بحد أقصى 3)
+            <input type="file" accept="image/*" multiple (change)="onSubPicturesSelected($any($event.target).files)" />
+          </label>
+          <app-button type="submit" [disabled]="creatingProduct() || productForm.invalid || !hasCategories()">@if (creatingProduct()) { جاري الإنشاء... } @else { إنشاء منتج }</app-button>
+        </form>
+      </app-card>
+    </div>
+
+    <app-card>
+      <div class="list-header">
+        <div>
+          <h2 class="text-xl font-semibold text-slate-900">المنتجات</h2>
+          <p class="list-meta">عدد المنتجات: {{ totalItems() }} | الصفحة {{ currentPage() }} من {{ totalPages() }}</p>
+        </div>
+      </div>
+
+      @if (productsLoading()) {
+        <div class="list-state">
+          <app-loading-spinner label="جاري تحميل المنتجات..." />
+        </div>
+      } @else if (!hasProducts()) {
+        <div class="list-state empty-state">لا توجد منتجات لعرضها في هذه الصفحة.</div>
+      } @else {
+        <div class="products-list">
+          @for (product of products(); track product.id) {
+            <div class="item-row">
+              <img [src]="product.mainPicture" [alt]="product.name" />
+              <div>
+                <strong>{{ product.name }}</strong>
+                <p>{{ product.price | currency: 'SAR' }} - مخزون {{ product.stock }}</p>
+              </div>
+              <div class="item-actions">
+                <app-badge [tone]="product.isActive ? 'emerald' : 'slate'">{{ product.isActive ? 'نشط' : 'غير نشط' }}</app-badge>
+                <app-button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  [disabled]="togglingProductId() === product.id"
+                  (pressed)="toggleProductActive(product)"
+                >
+                  @if (togglingProductId() === product.id) { جاري التحديث... } @else if (product.isActive) { تعطيل } @else { تفعيل }
+                </app-button>
+                <app-button
+                  type="button"
+                  size="sm"
+                  variant="danger"
+                  [disabled]="deletingProductId() === product.id"
+                  (pressed)="deleteProduct(product)"
+                >
+                  @if (deletingProductId() === product.id) { جاري الحذف... } @else { حذف }
+                </app-button>
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (totalPages() > 1) {
+          <nav class="pagination" aria-label="Product pagination">
+            <app-button type="button" size="sm" variant="secondary" [disabled]="currentPage() === 1 || productsLoading()" (pressed)="goToPage(currentPage() - 1)">
+              السابق
+            </app-button>
+
+            <div class="page-numbers">
+              @for (page of visiblePages(); track page) {
+                <button type="button" class="page-chip" [class.active]="page === currentPage()" [disabled]="productsLoading()" (click)="goToPage(page)">
+                  {{ page }}
+                </button>
+              }
+            </div>
+
+            <app-button type="button" size="sm" variant="secondary" [disabled]="currentPage() === totalPages() || productsLoading()" (pressed)="goToPage(currentPage() + 1)">
+              التالي
+            </app-button>
+          </nav>
+        }
+      }
+    </app-card>
+  }
+</section>

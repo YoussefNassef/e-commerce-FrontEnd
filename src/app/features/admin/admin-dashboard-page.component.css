@@ -1,0 +1,98 @@
+:host {
+  display: block;
+}
+
+.hub-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.hub-hero {
+  padding: 1.25rem;
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 183, 0.2), transparent 34%),
+    linear-gradient(135deg, #0b1830, #123458 52%, #0f6a74);
+  color: #f8fbff;
+}
+
+.hub-kicker {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #92edf2;
+}
+
+.hub-hero h1 {
+  margin: 0.35rem 0 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+}
+
+.hub-hero p {
+  margin: 0.7rem 0 0;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 44rem;
+}
+
+.hub-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.hub-card {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid #d8e3ee;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #ffffff, #f8fbfd);
+  text-decoration: none;
+  color: #11233a;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.hub-card:hover {
+  transform: translateY(-2px);
+  border-color: #9fdbe3;
+  box-shadow: 0 12px 24px rgba(15, 23, 47, 0.08);
+}
+
+.hub-card.feature {
+  background:
+    radial-gradient(circle at top right, rgba(255, 204, 128, 0.35), transparent 32%),
+    linear-gradient(145deg, #0d3143, #125d70);
+  color: #f8fdff;
+  border-color: rgba(18, 93, 112, 0.4);
+}
+
+.hub-card.feature .hub-badge,
+.hub-card.feature .hub-link,
+.hub-card.feature p {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.hub-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0b7285;
+}
+
+.hub-card strong {
+  font-size: 1.1rem;
+}
+
+.hub-card p {
+  margin: 0;
+  color: #64748b;
+}
+
+.hub-link {
+  color: #0b7285;
+  font-weight: 800;
+}

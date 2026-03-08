@@ -1,0 +1,65 @@
+:host {
+  display: block;
+}
+
+.filters-shell {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.65rem;
+  border: 1px solid #dee7f0;
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.85rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #33495f;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid #cdd9e6;
+  border-radius: 0.65rem;
+  background: #fff;
+  padding: 0.52rem 0.65rem;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toggle-row input {
+  width: auto;
+}
+
+.actions {
+  display: flex;
+  align-items: end;
+}
+
+.validation {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 600;
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1024px) {
+  .filters-shell {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 740px) {
+  .filters-shell {
+    grid-template-columns: 1fr;
+  }
+}

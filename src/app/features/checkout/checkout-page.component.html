@@ -1,0 +1,169 @@
+﻿<section class="space-y-6">
+  <header class="space-y-2">
+    <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">إتمام الطلب</h1>
+    <p class="text-sm text-slate-600">اختر عنوان الشحن والطريقة المناسبة، ثم أكمل الدفع.</p>
+  </header>
+
+  @if (error()) {
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-base font-medium text-rose-800">
+      {{ error() }}
+    </div>
+  }
+
+  @if (orderId()) {
+    <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-base text-emerald-900">
+      <span>تم إنشاء الطلب: <strong>{{ orderId() }}</strong></span>
+      @if (currentOrderStatus()) {
+        <span class="rounded-full bg-white px-3 py-1 text-sm font-semibold capitalize text-slate-800">
+          {{ currentOrderStatus() }}
+        </span>
+      }
+      <a routerLink="/orders" class="font-semibold text-teal-700 underline underline-offset-2">عرض الطلبات</a>
+    </div>
+  }
+
+  @if (paymentStatus()) {
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-base font-medium text-emerald-800">
+      {{ paymentStatus() }}
+    </div>
+  }
+
+  @if (paymentError()) {
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-base font-medium text-rose-800">
+      {{ paymentError() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل بيانات الدفع..." />
+  } @else if ((!cart() || cart()!.items.length === 0) && !orderId()) {
+    <app-state-panel title="السلة فارغة" message="أضف منتجات أولًا ثم تابع إلى الدفع.">
+      <div class="mt-4">
+        <a routerLink="/products" class="font-semibold text-teal-700 underline underline-offset-2">تصفح المنتجات</a>
+      </div>
+    </app-state-panel>
+  } @else {
+    <div class="grid gap-6 xl:grid-cols-2">
+      @if (cart() && cart()!.items.length > 0) {
+        <app-card class="grid h-fit gap-4">
+          <h3 class="text-xl font-semibold text-slate-900">العنوان والشحن</h3>
+
+          @if (!addresses().length) {
+            <p class="text-sm text-rose-700">
+              لا يوجد عنوان محفوظ. <a routerLink="/addresses" class="underline">أضف عنوانًا جديدًا</a>
+            </p>
+          } @else {
+            <label class="grid gap-2 text-sm font-semibold text-slate-700">
+              عنوان الشحن
+              <select
+                [value]="selectedAddressId()"
+                (change)="selectAddress($any($event.target).value)"
+                class="rounded-xl border border-slate-300 px-4 py-3 text-sm"
+              >
+                @for (address of addresses(); track address.id) {
+                  <option [value]="address.id">
+                    {{ address.label }} - {{ address.city }} - {{ address.line1 }} @if (address.isDefault) { (افتراضي) }
+                  </option>
+                }
+              </select>
+            </label>
+
+            <label class="grid gap-2 text-sm font-semibold text-slate-700">
+              طريقة الشحن
+              <select
+                [value]="shippingMethod()"
+                (change)="selectShippingMethod($any($event.target).value)"
+                class="rounded-xl border border-slate-300 px-4 py-3 text-sm"
+              >
+                <option value="standard">قياسي</option>
+                <option value="express">سريع</option>
+              </select>
+            </label>
+
+            <small class="text-sm text-slate-500">يتم تحديث السعر تلقائيًا عند تغيير العنوان أو طريقة الشحن.</small>
+          }
+
+          @if (quote()) {
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p>إجمالي المنتجات: <strong>{{ quote()!.subtotalAmount | currency: 'SAR' }}</strong></p>
+              <p>الخصم: <strong>{{ quote()!.discountAmount | currency: 'SAR' }}</strong></p>
+              <p>الشحن: <strong>{{ quote()!.shippingCost | currency: 'SAR' }}</strong> ({{ quote()!.shippingEtaDays }} يوم)</p>
+              <p class="text-base text-slate-900">الإجمالي النهائي: <strong>{{ quote()!.totalAmount | currency: 'SAR' }}</strong></p>
+            </div>
+          }
+
+          <p class="text-lg text-slate-700">العناصر: <strong class="text-slate-900">{{ cart()!.totalItems }}</strong></p>
+          <p class="text-lg text-slate-700">
+            الإجمالي المستحق:
+            <strong class="text-slate-900">{{ (quote()?.totalAmount ?? cart()!.totalPrice) | currency: 'SAR' }}</strong>
+          </p>
+          <app-button type="button" [disabled]="placing() || !selectedAddressId()" (pressed)="placeOrder()">
+            @if (placing()) { جاري إنشاء الطلب... } @else { إنشاء الطلب }
+          </app-button>
+          <small class="text-sm text-slate-500">الآن سيتم إنشاء الطلب بطلب واحد فقط عند الضغط على الزر.</small>
+        </app-card>
+      }
+
+      <app-card>
+        <h3 class="mb-4 text-2xl font-semibold text-slate-900">الدفع بالبطاقة</h3>
+        <form [formGroup]="paymentForm" (ngSubmit)="payOrder()" class="grid gap-4">
+          <label class="grid gap-2 text-base font-semibold text-slate-700">
+            اسم حامل البطاقة
+            <input
+              type="text"
+              formControlName="name"
+              placeholder="محمد أحمد"
+              class="rounded-xl border border-slate-300 px-4 py-3 text-base outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+          <label class="grid gap-2 text-base font-semibold text-slate-700">
+            رقم البطاقة
+            <input
+              type="text"
+              formControlName="number"
+              placeholder="4111111111111111"
+              class="rounded-xl border border-slate-300 px-4 py-3 text-base outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+          <div class="grid gap-4 sm:grid-cols-3">
+            <label class="grid gap-2 text-base font-semibold text-slate-700">
+              الشهر
+              <input
+                type="number"
+                formControlName="month"
+                min="1"
+                max="12"
+                class="rounded-xl border border-slate-300 px-4 py-3 text-base outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </label>
+            <label class="grid gap-2 text-base font-semibold text-slate-700">
+              السنة
+              <input
+                type="number"
+                formControlName="year"
+                class="rounded-xl border border-slate-300 px-4 py-3 text-base outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </label>
+            <label class="grid gap-2 text-base font-semibold text-slate-700">
+              CVC
+              <input
+                type="text"
+                formControlName="cvc"
+                placeholder="123"
+                class="rounded-xl border border-slate-300 px-4 py-3 text-base outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </label>
+          </div>
+          <app-button type="submit" [disabled]="paying() || !orderId() || paymentForm.invalid">
+            @if (paying()) { جاري المعالجة... } @else { ادفع الآن }
+          </app-button>
+          @if (!orderId()) {
+            <small class="text-sm text-slate-500">أنشئ الطلب أولًا لتفعيل الدفع.</small>
+          } @else {
+            <app-button type="button" variant="secondary" (pressed)="refreshOrderStatus()">تحديث حالة الدفع</app-button>
+          }
+        </form>
+      </app-card>
+    </div>
+  }
+</section>

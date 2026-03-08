@@ -1,0 +1,138 @@
+﻿<section class="products-shell">
+  <header class="page-head">
+    <div>
+      <h1>المنتجات</h1>
+      <p>استعرض الكتالوج مع البحث، الفرز، والتصفية المباشرة من الخادم.</p>
+    </div>
+    <div class="meta-chip">
+      <span>إجمالي النتائج</span>
+      <strong>{{ meta().totalItems }}</strong>
+    </div>
+  </header>
+
+  <app-products-filters
+    [search]="searchDraft()"
+    [selectedCategory]="selectedCategoryToken()"
+    [minPrice]="queryState().minPrice"
+    [maxPrice]="queryState().maxPrice"
+    [isActive]="isActiveToken()"
+    [inStockOnly]="queryState().inStockOnly"
+    [loading]="loading()"
+    [categories]="categories()"
+    [minMaxError]="validationError()"
+    (searchChanged)="onSearchInput($event)"
+    (categoryChanged)="onCategoryChanged($event)"
+    (minPriceChanged)="onMinPriceChanged($event)"
+    (maxPriceChanged)="onMaxPriceChanged($event)"
+    (isActiveChanged)="onIsActiveChanged($event)"
+    (inStockChanged)="onInStockChanged($event)"
+    (resetPressed)="resetFilters()"
+  />
+
+  <section class="toolbar-row">
+    <app-products-sort [value]="sortOption()" [disabled]="loading()" (valueChanged)="onSortChanged($event)" />
+    <div class="toolbar-side">
+      @if (hasAnyFilters()) {
+        <app-button type="button" variant="secondary" (pressed)="resetFilters()">مسح الفلاتر</app-button>
+      }
+      <a routerLink="/cart" class="cart-link">السلة</a>
+    </div>
+  </section>
+
+  @if (notice()) {
+    <div class="notice ok">{{ notice() }}</div>
+  }
+
+  @if (error()) {
+    <div class="notice err">
+      <span>{{ error() }}</span>
+      <app-button type="button" size="sm" variant="secondary" (pressed)="retry()">إعادة المحاولة</app-button>
+    </div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل المنتجات..." />
+  } @else if (!products().length) {
+    <app-state-panel title="لا توجد منتجات مطابقة" message="جرّب تعديل البحث أو الفلاتر.">
+      <div class="state-actions">
+        <app-button type="button" variant="secondary" (pressed)="resetFilters()">إعادة ضبط</app-button>
+      </div>
+    </app-state-panel>
+  } @else {
+    <div class="products-grid">
+      @for (product of products(); track product.id) {
+        <article class="product-card">
+          <img [src]="product.mainPicture" [alt]="product.name" />
+          <div class="product-head">
+            <app-badge [tone]="categoryTone(product.category)">{{ categoryLabel(product.category) }}</app-badge>
+            <span>المخزون: {{ product.stock }}</span>
+          </div>
+          <h3>{{ product.name }}</h3>
+          <p>{{ product.description || 'لا يوجد وصف متاح.' }}</p>
+          <div class="product-price">
+            <strong>{{ product.price | currency: 'SAR' }}</strong>
+            <small>SKU: {{ product.sku }}</small>
+          </div>
+          <div class="product-actions">
+            <a [routerLink]="['/products', product.id]" class="view-btn">عرض التفاصيل</a>
+            <app-button
+              variant="secondary"
+              [disabled]="busyWishlistProductId() === product.id"
+              [fullWidth]="true"
+              ariaLabel="إضافة أو إزالة من المفضلة"
+              (pressed)="toggleWishlist(product)"
+            >
+              @if (busyWishlistProductId() === product.id) {
+                جار التحديث...
+              } @else if (isInWishlist(product.id)) {
+                إزالة من المفضلة
+              } @else {
+                أضف إلى المفضلة
+              }
+            </app-button>
+            <app-button
+              [disabled]="busyProductId() === product.id || product.stock <= 0 || !product.isActive"
+              [fullWidth]="true"
+              ariaLabel="إضافة المنتج إلى السلة"
+              (pressed)="addToCart(product)"
+            >
+              @if (busyProductId() === product.id) {
+                جار الإضافة...
+              } @else if (product.stock <= 0) {
+                نفد المخزون
+              } @else if (!product.isActive) {
+                غير نشط
+              } @else {
+                أضف إلى السلة
+              }
+            </app-button>
+          </div>
+        </article>
+      }
+    </div>
+
+    <footer class="pagination-shell">
+      <app-button
+        type="button"
+        variant="secondary"
+        [disabled]="!meta().hasPreviousPage"
+        (pressed)="goToPage(queryState().page - 1)"
+      >السابق</app-button>
+
+      <div class="page-list">
+        @for (page of pageNumbers(); track page) {
+          <button type="button" class="page-btn" [class.active]="page === queryState().page" (click)="goToPage(page)">
+            {{ page }}
+          </button>
+        }
+      </div>
+
+      <app-button
+        type="button"
+        variant="secondary"
+        [disabled]="!meta().hasNextPage"
+        (pressed)="goToPage(queryState().page + 1)"
+      >التالي</app-button>
+    </footer>
+  }
+</section>

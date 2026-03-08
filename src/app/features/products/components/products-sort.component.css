@@ -1,0 +1,19 @@
+:host {
+  display: block;
+}
+
+.sort-shell {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #33495f;
+}
+
+select {
+  width: 100%;
+  border: 1px solid #cdd9e6;
+  border-radius: 0.65rem;
+  background: #fff;
+  padding: 0.52rem 0.65rem;
+}

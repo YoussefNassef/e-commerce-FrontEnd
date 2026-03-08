@@ -1,0 +1,62 @@
+﻿<div class="drawer-overlay" [class.open]="open" (click)="close()"></div>
+
+<aside class="drawer-panel" [class.open]="open" (click)="$event.stopPropagation()" aria-label="درج سلة التسوق">
+  <header class="drawer-head">
+    <h2>سلتك</h2>
+    <app-button variant="ghost" size="sm" ariaLabel="إغلاق درج السلة" (pressed)="close()">إغلاق</app-button>
+  </header>
+
+  @if (notice()) {
+    <div class="drawer-alert success">{{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="drawer-alert danger">{{ error() }}</div>
+  }
+
+  <div class="drawer-body">
+    @if (loading()) {
+      <app-loading-spinner label="جاري تحميل السلة..." />
+    } @else if (!cart() || cart()!.items.length === 0) {
+      <div class="drawer-empty">
+        <p>السلة فارغة.</p>
+        <a routerLink="/products" (click)="close()">تصفح المنتجات</a>
+      </div>
+    } @else {
+      <div class="drawer-items">
+        @for (item of cart()!.items; track item.id) {
+          <article class="drawer-item">
+            <img [src]="item.product.mainPicture" [alt]="item.product.name" />
+            <div class="item-content">
+              <div class="item-line">
+                <h3>{{ item.product.name }}</h3>
+                <app-badge tone="blue">{{ categoryLabel(item.product.category) }}</app-badge>
+              </div>
+              <p class="item-price">{{ item.price | currency: 'SAR' }} للقطعة</p>
+              <div class="item-actions">
+                <app-button size="sm" variant="secondary" ariaLabel="تقليل الكمية" (pressed)="updateQuantity(item.id, item.quantity - 1)">-</app-button>
+                <span class="qty">{{ item.quantity }}</span>
+                <app-button size="sm" variant="secondary" ariaLabel="زيادة الكمية" (pressed)="updateQuantity(item.id, item.quantity + 1)">+</app-button>
+                <app-button size="sm" variant="danger" (pressed)="remove(item.id)">حذف</app-button>
+              </div>
+            </div>
+            <strong class="item-subtotal">{{ item.subtotal | currency: 'SAR' }}</strong>
+          </article>
+        }
+      </div>
+    }
+  </div>
+
+  @if (cart() && cart()!.items.length > 0) {
+    <footer class="drawer-foot">
+      <div class="totals">
+        <span>{{ cart()!.totalItems }} عنصر</span>
+        <strong>{{ cart()!.totalPrice | currency: 'SAR' }}</strong>
+      </div>
+      <div class="foot-actions">
+        <app-button variant="ghost" (pressed)="goToCart()">عرض السلة</app-button>
+        <app-button variant="secondary" (pressed)="clear()">تفريغ</app-button>
+        <app-button (pressed)="checkout()">الدفع</app-button>
+      </div>
+    </footer>
+  }
+</aside>

@@ -1,0 +1,74 @@
+<section class="space-y-6">
+  <header class="page-head">
+    <div>
+      <h1>الإشعارات</h1>
+      <p>عدد الإشعارات: {{ totalItems() }}</p>
+    </div>
+
+    <app-button type="button" variant="secondary" [disabled]="markingAll() || !hasNotifications()" (pressed)="markAllAsRead()">
+      @if (markingAll()) { جاري التحديث... } @else { تعليم الكل كمقروء }
+    </app-button>
+  </header>
+
+  @if (notice()) {
+    <div class="notice ok">{{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="notice err">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل الإشعارات..." />
+  } @else if (!hasNotifications()) {
+    <app-card>
+      <p class="empty-state">لا توجد إشعارات حاليًا.</p>
+    </app-card>
+  } @else {
+    <div class="notifications-list">
+      @for (notification of notifications(); track notification.id) {
+        <app-card class="notification-card" [class.unread]="!notification.isRead">
+          <div class="notification-row">
+            <div class="notification-copy">
+              <div class="notification-top">
+                <span class="type-chip">{{ notificationTypeLabel(notification.type) }}</span>
+                @if (!notification.isRead) {
+                  <span class="new-dot"></span>
+                }
+              </div>
+              <strong>{{ notification.title }}</strong>
+              <p>{{ notification.body }}</p>
+              <small>{{ notification.createdAt | date: 'medium' }}</small>
+            </div>
+
+            <div class="notification-actions">
+              @if (notificationLink(notification); as link) {
+                <a [routerLink]="link.path" [queryParams]="link.queryParams ?? null" class="inline-link">فتح</a>
+              }
+              <app-button
+                type="button"
+                size="sm"
+                variant="secondary"
+                [disabled]="notification.isRead || markingId() === notification.id"
+                (pressed)="markAsRead(notification)"
+              >
+                @if (markingId() === notification.id) { جاري... } @else { مقروء }
+              </app-button>
+            </div>
+          </div>
+        </app-card>
+      }
+    </div>
+
+    @if (totalPages() > 1) {
+      <nav class="pagination">
+        <app-button type="button" size="sm" variant="secondary" [disabled]="currentPage() === 1" (pressed)="goToPage(currentPage() - 1)">
+          السابق
+        </app-button>
+        <span class="page-meta">الصفحة {{ currentPage() }} من {{ totalPages() }}</span>
+        <app-button type="button" size="sm" variant="secondary" [disabled]="currentPage() === totalPages()" (pressed)="goToPage(currentPage() + 1)">
+          التالي
+        </app-button>
+      </nav>
+    }
+  }
+</section>

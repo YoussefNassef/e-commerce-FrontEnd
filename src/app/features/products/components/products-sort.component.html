@@ -1,0 +1,11 @@
+<label class="sort-shell">
+  ترتيب النتائج
+  <select [value]="value" [disabled]="disabled" (change)="valueChanged.emit($any($event.target).value)">
+    <option value="name-asc">الاسم A-Z</option>
+    <option value="name-desc">الاسم Z-A</option>
+    <option value="price-asc">السعر من الأقل للأعلى</option>
+    <option value="price-desc">السعر من الأعلى للأقل</option>
+    <option value="stock-desc">المخزون من الأعلى للأقل</option>
+    <option value="stock-asc">المخزون من الأقل للأعلى</option>
+  </select>
+</label>

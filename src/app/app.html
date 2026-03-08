@@ -1,0 +1,98 @@
+﻿<div class="biz-shell">
+  <header class="biz-header">
+    <div class="biz-utility">
+      <div class="biz-wrap utility-row">
+        <span>توصيل مجاني في اليوم التالي</span>
+        <span>ضمان مطابقة السعر</span>
+        <span>دعم على مدار الساعة</span>
+      </div>
+    </div>
+
+    <div class="biz-wrap main-row">
+      <a routerLink="/products" class="biz-brand">
+        <span class="brand-dot"></span>
+        <div>
+          <strong>متجر الأجهزة</strong>
+          <small>كتالوج الأعمال</small>
+        </div>
+      </a>
+
+      <div class="biz-session">
+        @if (auth.isAuthenticated()) {
+          <div class="notifications-anchor">
+            <button type="button" class="icon-btn notification-bell" aria-label="الإشعارات" (click)="toggleNotificationsPanel($event)">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 3a4 4 0 0 0-4 4v1.1c0 .7-.2 1.4-.6 1.9L6 12.2c-.6.8-.2 1.8.8 1.8h10.4c1 0 1.4-1 .8-1.8L16.6 10c-.4-.5-.6-1.2-.6-1.9V7a4 4 0 0 0-4-4Zm0 18a2.7 2.7 0 0 1-2.6-2h5.2A2.7 2.7 0 0 1 12 21Z"
+                />
+              </svg>
+              @if (unreadNotifications() > 0) {
+                <span class="bell-count">{{ unreadNotifications() }}</span>
+              }
+            </button>
+
+            @if (notificationsPanelOpen()) {
+              <div class="notifications-backdrop" (click)="closeNotificationsPanel()"></div>
+              <section class="notifications-popover" (click)="$event.stopPropagation()">
+                <header class="popover-head">
+                  <strong>الإشعارات</strong>
+                  <button type="button" class="ghost-link" (click)="openNotificationsPage()">عرض الكل</button>
+                </header>
+
+                @if (notificationsLoading()) {
+                  <p class="popover-state">جاري التحميل...</p>
+                } @else if (notificationsPanelError()) {
+                  <p class="popover-state error">{{ notificationsPanelError() }}</p>
+                } @else if (!notificationPreview().length) {
+                  <p class="popover-state">لا توجد إشعارات جديدة.</p>
+                } @else {
+                  <div class="popover-list">
+                    @for (notification of notificationPreview(); track notification.id) {
+                      <button type="button" class="popover-item" [class.unread]="!notification.isRead" (click)="openNotification(notification)">
+                        <div class="item-title-row">
+                          <strong>{{ notification.title }}</strong>
+                          @if (!notification.isRead) {
+                            <span class="item-dot"></span>
+                          }
+                        </div>
+                        <p>{{ notification.body }}</p>
+                      </button>
+                    }
+                  </div>
+                }
+              </section>
+            }
+          </div>
+          <button type="button" class="cart-btn" (click)="openCartDrawer()">السلة</button>
+          <a routerLink="/profile" class="session-user">{{ auth.userName() || auth.userPhone() }}</a>
+          <button type="button" (click)="logout()" class="session-logout">تسجيل الخروج</button>
+        } @else {
+          <a routerLink="/auth" class="session-login">تسجيل الدخول</a>
+        }
+      </div>
+    </div>
+
+    <nav class="biz-nav">
+      <div class="biz-wrap nav-row">
+        <a routerLink="/products" routerLinkActive="biz-link-active" class="biz-link">كل المنتجات</a>
+        @if (auth.isAuthenticated()) {
+          <a routerLink="/wishlist" routerLinkActive="biz-link-active" class="biz-link">المفضلة</a>
+          <a routerLink="/addresses" routerLinkActive="biz-link-active" class="biz-link">العناوين</a>
+          <a routerLink="/orders" routerLinkActive="biz-link-active" class="biz-link">الطلبات</a>
+          @if (auth.user()?.role === 'admin') {
+            <a routerLink="/admin" routerLinkActive="biz-link-active" class="biz-link">لوحة الإدارة</a>
+          }
+          <a routerLink="/profile" routerLinkActive="biz-link-active" class="biz-link">حسابي</a>
+        }
+      </div>
+    </nav>
+  </header>
+
+  <main class="biz-main">
+    <router-outlet />
+  </main>
+
+  @if (auth.isAuthenticated()) {
+    <app-cart-drawer [open]="cartDrawerOpen()" (closed)="closeCartDrawer()" />
+  }
+</div>

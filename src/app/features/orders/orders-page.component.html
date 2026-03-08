@@ -1,0 +1,79 @@
+﻿<section class="space-y-6">
+  <header class="space-y-2">
+    <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">طلباتي</h1>
+    <p class="text-sm text-slate-600">تابع حالة طلباتك والدفع بسهولة.</p>
+  </header>
+
+  @if (error()) {
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-base font-medium text-rose-800">
+      {{ error() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner label="جاري تحميل الطلبات..." />
+  } @else if (orders().length === 0) {
+    <app-state-panel title="لا توجد طلبات بعد" message="ستظهر مشترياتك الأخيرة هنا.">
+      <div class="mt-4">
+        <app-button variant="secondary" (pressed)="loadOrders()">تحديث</app-button>
+      </div>
+    </app-state-panel>
+  } @else {
+    <div class="grid gap-4">
+      @for (order of orders(); track order.id) {
+        <app-card>
+          <header class="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <strong class="text-xl text-slate-900">#{{ order.id }}</strong>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold capitalize text-slate-700">
+              {{ order.status }}
+            </span>
+          </header>
+          <p class="mb-2 text-base text-slate-600">{{ order.createdAt | date: 'medium' }}</p>
+          <p class="mb-3 text-base text-slate-700">الإجمالي: <strong class="text-slate-900">{{ order.totalAmount | currency: 'SAR' }}</strong></p>
+          <ul class="list-disc space-y-1 pr-5 text-base text-slate-600">
+            @for (item of order.items; track item.id) {
+              <li>{{ item.product.name }} × {{ item.quantity }} = {{ item.subtotal | currency: 'SAR' }}</li>
+            }
+          </ul>
+          <div class="mt-4 grid gap-3">
+            <app-button
+              variant="secondary"
+              [disabled]="loadingTrackingOrderId() === order.id"
+              (pressed)="loadTracking(order.id)"
+            >
+              @if (loadingTrackingOrderId() === order.id) { جاري تحميل التتبع... } @else { عرض تتبع الشحنة }
+            </app-button>
+
+            @if (trackingByOrderId()[order.id]) {
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <p>حالة التوصيل: <strong class="capitalize">{{ trackingByOrderId()[order.id].deliveryStatus }}</strong></p>
+                @if (trackingByOrderId()[order.id].shippingCarrier) {
+                  <p>شركة الشحن: <strong>{{ trackingByOrderId()[order.id].shippingCarrier }}</strong></p>
+                }
+                @if (trackingByOrderId()[order.id].trackingNumber) {
+                  <p>رقم التتبع: <strong>{{ trackingByOrderId()[order.id].trackingNumber }}</strong></p>
+                }
+                @if (trackingByOrderId()[order.id].currentLocation) {
+                  <p>الموقع الحالي: <strong>{{ trackingByOrderId()[order.id].currentLocation }}</strong></p>
+                }
+                @if (trackingByOrderId()[order.id].trackingNote) {
+                  <p>ملاحظة: <strong>{{ trackingByOrderId()[order.id].trackingNote }}</strong></p>
+                }
+                @if (trackingByOrderId()[order.id].estimatedDeliveryAt) {
+                  <p>موعد التسليم المتوقع: <strong>{{ trackingByOrderId()[order.id].estimatedDeliveryAt | date: 'medium' }}</strong></p>
+                }
+                @if (trackingByOrderId()[order.id].trackingUrl) {
+                  <p>
+                    <a [href]="trackingByOrderId()[order.id].trackingUrl!" target="_blank" rel="noopener noreferrer" class="underline text-teal-700">
+                      فتح رابط التتبع
+                    </a>
+                  </p>
+                }
+              </div>
+            }
+          </div>
+        </app-card>
+      }
+    </div>
+  }
+</section>
