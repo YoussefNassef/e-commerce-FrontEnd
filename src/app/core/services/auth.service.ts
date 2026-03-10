@@ -1,29 +1,36 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
-import { catchError, finalize, map, shareReplay, tap } from 'rxjs/operators';
+import { catchError, finalize, map, shareReplay, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../models/environment';
-import { ApiUser } from '../models/api.models';
+import { ApiUser, AuthSessionInfo } from '../models/api.models';
 
-const TOKEN_KEY = 'store_token';
-const REFRESH_TOKEN_KEY = 'store_refresh_token';
-const USER_KEY = 'store_user';
+const LEGACY_TOKEN_KEY = 'store_token';
+const LEGACY_USER_KEY = 'store_user';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
-  private readonly api = environment.apiBaseUrl;
+  private readonly api = this.normalizeApiBase(environment.apiBaseUrl);
 
-  private readonly tokenSignal = signal<string | null>(this.readStoredToken());
-  private readonly refreshTokenSignal = signal<string | null>(this.readStoredRefreshToken());
-  private readonly userSignal = signal<ApiUser | null>(this.readStoredUser());
-  private refreshRequest$: Observable<string | null> | null = null;
+  private readonly tokenSignal = signal<string | null>(null);
+  private readonly userSignal = signal<ApiUser | null>(null);
+  private readonly authCheckCompletedSignal = signal(false);
+
+  private refreshRequest$: Observable<void> | null = null;
+  private authBootstrap$: Observable<boolean> | null = null;
 
   readonly token = this.tokenSignal.asReadonly();
   readonly user = this.userSignal.asReadonly();
-  readonly isAuthenticated = computed(() => !!this.tokenSignal());
+  readonly isAuthenticated = computed(() => !!this.userSignal());
   readonly userName = computed(() => this.userSignal()?.fullName ?? '');
   readonly userPhone = computed(() => this.userSignal()?.phone ?? '');
+  readonly authCheckInProgress = computed(() => !this.authCheckCompletedSignal());
+
+  constructor() {
+    this.cleanupLegacyTokenStorage();
+    this.cleanupLegacyUserStorage();
+  }
 
   register(payload: { fullName: string; phone: string }) {
     return this.http.post<{ message: string }>(`${this.api}/auth/register`, payload);
@@ -35,41 +42,87 @@ export class AuthService {
 
   verifyOtp(phone: string, code: string) {
     return this.http
-      .post<Record<string, unknown>>(`${this.api}/auth/verify-otp`, { phone, code })
+      .post<Record<string, unknown>>(`${this.api}/auth/verify-otp`, { phone, code }, { withCredentials: true })
       .pipe(
         tap((response) => {
-          const token = this.extractToken(response);
-          const refreshToken = this.extractRefreshToken(response);
-          const user = this.extractUser(response, phone, token);
-          this.setSession(token, user, refreshToken);
-          this.refreshCurrentUser().subscribe();
-        })
+          const user = this.extractUser(response, phone);
+          this.setSession(user);
+        }),
+        switchMap((response) =>
+          this.refreshCurrentUser().pipe(
+            map(() => response),
+            catchError(() => of(response))
+          )
+        )
       );
   }
 
   verifyOtpCode(phone: string, code: string) {
-    return this.http.post<Record<string, unknown>>(`${this.api}/auth/verify-otp`, {
-      phone,
-      code
-    });
+    return this.http.post<Record<string, unknown>>(
+      `${this.api}/auth/verify-otp`,
+      {
+        phone,
+        code
+      },
+      { withCredentials: true }
+    );
   }
 
-  logout(): void {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+  logout() {
+    return this.http.post<unknown>(`${this.api}/auth/logout`, {}, { withCredentials: true }).pipe(
+      map(() => void 0),
+      catchError(() => of(void 0)),
+      tap(() => this.clearAuthState())
+    );
+  }
+
+  clearAuthState(): void {
+    this.cleanupLegacyTokenStorage();
+    this.cleanupLegacyUserStorage();
     this.tokenSignal.set(null);
-    this.refreshTokenSignal.set(null);
     this.userSignal.set(null);
+    this.refreshRequest$ = null;
+  }
+
+  setAccessToken(token: string | null): void {
+    if (!token || !token.trim()) {
+      this.tokenSignal.set(null);
+      return;
+    }
+
+    const normalized = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
+    this.tokenSignal.set(normalized);
+  }
+
+  ensureAuthReady(): Observable<boolean> {
+    if (this.authCheckCompletedSignal()) {
+      return of(true);
+    }
+
+    if (this.authBootstrap$) {
+      return this.authBootstrap$;
+    }
+
+    const request$ = this.trySilentRefresh().pipe(
+      map(() => true),
+      catchError(() => of(true)),
+      finalize(() => {
+        this.authCheckCompletedSignal.set(true);
+        this.authBootstrap$ = null;
+      }),
+      shareReplay(1)
+    );
+
+    this.authBootstrap$ = request$;
+    return request$;
   }
 
   bootstrapSession() {
-    return this.refreshCurrentUser();
+    return this.ensureAuthReady();
   }
 
   authHeaderValue(): string | null {
-    const token = this.tokenSignal();
-    return token ? `Bearer ${token}` : null;
+    return null;
   }
 
   updateLocalProfile(payload: { fullName: string; phone: string }): void {
@@ -84,7 +137,6 @@ export class AuthService {
       phone: payload.phone.trim() || current.phone
     };
 
-    localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
     this.userSignal.set(nextUser);
   }
 
@@ -97,7 +149,7 @@ export class AuthService {
         map((response) => this.extractUserFromProfileResponse(response)),
         tap((user) => {
           if (user) {
-            this.setSession(this.tokenSignal() ?? '', user);
+            this.setSession(user);
           }
         })
       );
@@ -107,6 +159,26 @@ export class AuthService {
     return this.http.post<{ message?: string }>(`${this.api}/users/me/phone-change/request`, {
       phone: phone.trim()
     });
+  }
+
+  getSessions() {
+    return this.http.get<AuthSessionInfo[]>(`${this.api}/auth/sessions`, { withCredentials: true });
+  }
+
+  revokeSession(sessionId: string) {
+    return this.http.delete<{ success: boolean }>(`${this.api}/auth/sessions/${sessionId}`, { withCredentials: true });
+  }
+
+  logoutOtherSessions() {
+    return this.http.post<{ success: boolean; revokedCount: number }>(
+      `${this.api}/auth/sessions/logout-others`,
+      {},
+      { withCredentials: true }
+    );
+  }
+
+  ensureCsrfCookie() {
+    return this.http.get<{ csrfToken?: string }>(`${this.api}/auth/csrf`, { withCredentials: true });
   }
 
   verifyPhoneChange(payload: { phone: string; code: string }) {
@@ -119,22 +191,18 @@ export class AuthService {
         map((response) => this.extractUserFromProfileResponse(response)),
         tap((user) => {
           if (user) {
-            this.setSession(this.tokenSignal() ?? '', user);
+            this.setSession(user);
           }
         })
       );
   }
 
   refreshCurrentUser() {
-    if (!this.tokenSignal()) {
-      return of(null);
-    }
-
-    return this.http.get<unknown>(`${this.api}/users/me`).pipe(
+    return this.http.get<unknown>(`${this.api}/users/me`, { withCredentials: true }).pipe(
       map((response) => this.extractUserFromProfileResponse(response)),
       tap((user) => {
         if (user) {
-          this.setSession(this.tokenSignal() ?? '', user);
+          this.setSession(user);
         }
       }),
       catchError(() => of(null))
@@ -142,50 +210,66 @@ export class AuthService {
   }
 
   refreshAccessToken() {
-    if (!this.refreshTokenSignal()) {
-      return of(null);
-    }
-
     if (this.refreshRequest$) {
       return this.refreshRequest$;
     }
 
-    const request$ = this.http
-      .post<Record<string, unknown>>(`${this.api}/auth/refresh`, {
-        refreshToken: this.refreshTokenSignal()
-      })
+    const request$ = this.requestRefreshToken(this.api)
       .pipe(
-      map((response) => {
-        const token = this.extractToken(response);
-        const refreshToken = this.extractRefreshToken(response) ?? this.refreshTokenSignal();
-        const fallbackPhone = this.userSignal()?.phone ?? '';
-        const user = this.extractUser(response, fallbackPhone, token);
-        this.setSession(token, user, refreshToken);
-        return token;
-      }),
-      catchError((err) => {
-        this.logout();
-        return throwError(() => err);
-      }),
-      finalize(() => {
-        this.refreshRequest$ = null;
-      }),
-      shareReplay(1)
-    );
+        map(() => void 0),
+        catchError((err) => {
+          const fallbackApi = this.resolveRefreshFallbackApi(err);
+          if (!fallbackApi) {
+            return throwError(() => err);
+          }
+
+          return this.requestRefreshToken(fallbackApi).pipe(
+            map(() => void 0)
+          );
+        }),
+        finalize(() => {
+          this.refreshRequest$ = null;
+        }),
+        shareReplay(1)
+      );
 
     this.refreshRequest$ = request$;
     return request$;
   }
 
-  private setSession(token: string, user: ApiUser, refreshToken?: string | null): void {
-    localStorage.setItem(TOKEN_KEY, token);
-    const nextRefreshToken = refreshToken?.trim() ?? this.refreshTokenSignal();
-    if (nextRefreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
-      this.refreshTokenSignal.set(nextRefreshToken);
+  private trySilentRefresh() {
+    return this.refreshAccessToken().pipe(
+      switchMap(() => this.refreshCurrentUser()),
+      catchError(() => {
+        this.clearAuthState();
+        return of(null);
+      })
+    );
+  }
+
+  private requestRefreshToken(apiBase: string) {
+    return this.http.post<Record<string, unknown>>(`${apiBase}/auth/refresh`, {}, { withCredentials: true });
+  }
+
+  private resolveRefreshFallbackApi(error: unknown): string | null {
+    const err = error as { status?: unknown; error?: unknown } | null;
+    if (err?.status !== 404) {
+      return null;
     }
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-    this.tokenSignal.set(token);
+
+    const errorBody = this.asRecord(err.error);
+    const message = typeof errorBody?.['message'] === 'string' ? errorBody['message'].toLowerCase() : '';
+    const isMethodDowngrade = message.includes('cannot get') && message.includes('/api/auth/refresh');
+
+    const isHttpNgrok = this.api.startsWith('http://') && this.api.includes('ngrok-free.dev');
+    if (!isMethodDowngrade || !isHttpNgrok) {
+      return null;
+    }
+
+    return this.api.replace(/^http:\/\//, 'https://');
+  }
+
+  private setSession(user: ApiUser): void {
     this.userSignal.set(user);
   }
 
@@ -213,30 +297,13 @@ export class AuthService {
     const normalized = token.startsWith('Bearer ') ? token.slice(7).trim() : token;
 
     if (!normalized || normalized === 'undefined' || normalized === 'null') {
-      throw new Error('Token is missing in verify-otp response.');
+      throw new Error('Token is missing in auth response.');
     }
 
     return normalized;
   }
 
-  private extractRefreshToken(response: Record<string, unknown>): string | null {
-    const data = this.asRecord(response['data']);
-    const nestedData = this.asRecord(data?.['data']);
-
-    const candidates: unknown[] = [
-      response['refreshToken'],
-      response['refresh_token'],
-      data?.['refreshToken'],
-      data?.['refresh_token'],
-      nestedData?.['refreshToken'],
-      nestedData?.['refresh_token']
-    ];
-
-    const raw = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
-    return typeof raw === 'string' ? raw.trim() : null;
-  }
-
-  private extractUser(response: Record<string, unknown>, phone: string, token: string): ApiUser {
+  private extractUser(response: Record<string, unknown>, phone: string): ApiUser {
     const data = this.asRecord(response['data']);
     const nestedData = this.asRecord(data?.['data']);
 
@@ -258,8 +325,7 @@ export class AuthService {
           data?.['role'] ??
           data?.['userRole'] ??
           nestedData?.['role'] ??
-          nestedData?.['userRole'],
-        token
+          nestedData?.['userRole']
       );
       const idValue = user['id'];
       const fullNameValue = user['fullName'] ?? user['name'];
@@ -274,34 +340,20 @@ export class AuthService {
       };
     }
 
-    // Some backends return only token in verify endpoint.
     return {
       id: 0,
       fullName: 'User',
       phone,
-      role: this.resolveRole(data?.['role'] ?? nestedData?.['role'], token),
+      role: this.resolveRole(data?.['role'] ?? nestedData?.['role']),
       isVerified: true
     };
   }
 
-  private resolveRole(rawRole: unknown, token: string): 'admin' | 'user' {
+  private resolveRole(rawRole: unknown): 'admin' | 'user' {
     if (this.isAdminRole(rawRole)) {
       return 'admin';
     }
-
-    const tokenPayload = this.decodeJwtPayload(token);
-    if (!tokenPayload) {
-      return 'user';
-    }
-
-    const roleCandidates: unknown[] = [
-      tokenPayload['role'],
-      tokenPayload['userRole'],
-      tokenPayload['type'],
-      tokenPayload['roles']
-    ];
-
-    return roleCandidates.some((value) => this.isAdminRole(value)) ? 'admin' : 'user';
+    return 'user';
   }
 
   private isAdminRole(value: unknown): boolean {
@@ -315,23 +367,6 @@ export class AuthService {
     }
 
     return false;
-  }
-
-  private decodeJwtPayload(token: string): Record<string, unknown> | null {
-    const parts = token.split('.');
-    if (parts.length < 2) {
-      return null;
-    }
-
-    try {
-      const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
-      const json = atob(padded);
-      const parsed = JSON.parse(json);
-      return this.asRecord(parsed);
-    } catch {
-      return null;
-    }
   }
 
   private extractUserFromProfileResponse(response: unknown): ApiUser | null {
@@ -349,14 +384,13 @@ export class AuthService {
     const id = source['id'];
     const isVerified = source['isVerified'] ?? source['verified'];
     const role = source['role'] ?? source['userRole'] ?? source['type'];
-    const token = this.tokenSignal() ?? '';
 
     return {
       id: typeof id === 'number' ? id : 0,
       fullName: typeof fullName === 'string' && fullName.trim() ? fullName : 'User',
       phone: typeof phone === 'string' && phone.trim() ? phone : '',
       isVerified: typeof isVerified === 'boolean' ? isVerified : true,
-      role: this.resolveRole(role, token)
+      role: this.resolveRole(role)
     };
   }
 
@@ -364,45 +398,16 @@ export class AuthService {
     return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
   }
 
-  private readStoredToken(): string | null {
-    const token = localStorage.getItem(TOKEN_KEY)?.trim() ?? '';
-
-    if (!token || token === 'undefined' || token === 'null') {
-      localStorage.removeItem(TOKEN_KEY);
-      return null;
-    }
-
-    return token.startsWith('Bearer ') ? token.slice(7).trim() : token;
+  private normalizeApiBase(apiBaseUrl: string): string {
+    return apiBaseUrl.replace(/\/+$/, '');
   }
 
-  private readStoredRefreshToken(): string | null {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)?.trim() ?? '';
-    if (!refreshToken || refreshToken === 'undefined' || refreshToken === 'null') {
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      return null;
-    }
-    return refreshToken;
+  private cleanupLegacyTokenStorage(): void {
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
   }
 
-  private readStoredUser(): ApiUser | null {
-    const raw = localStorage.getItem(USER_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as Partial<ApiUser>;
-      const normalizedRole = typeof parsed.role === 'string' && parsed.role.toLowerCase().trim() === 'admin' ? 'admin' : 'user';
-      return {
-        id: typeof parsed.id === 'number' ? parsed.id : 0,
-        fullName: typeof parsed.fullName === 'string' ? parsed.fullName : 'User',
-        phone: typeof parsed.phone === 'string' ? parsed.phone : '',
-        role: normalizedRole,
-        isVerified: typeof parsed.isVerified === 'boolean' ? parsed.isVerified : true
-      };
-    } catch {
-      return null;
-    }
+  private cleanupLegacyUserStorage(): void {
+    localStorage.removeItem(LEGACY_USER_KEY);
+    sessionStorage.removeItem(LEGACY_USER_KEY);
   }
-
 }

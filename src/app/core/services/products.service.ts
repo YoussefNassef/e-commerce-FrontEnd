@@ -7,6 +7,13 @@ import { environment } from '../models/environment';
 import { inferProductCategory, ProductCategory } from '../models/product-category.model';
 import { parseApiBoolean } from '../utils/boolean.util';
 import { normalizeImageUrl } from '../utils/image-url.util';
+import {
+  CreateStockAdjustmentPayload,
+  GetStockAdjustmentsQuery,
+  StockAdjustmentItem,
+  StockAdjustmentsListResponse,
+  UpdateProductCommercialPayload
+} from '../models/inventory.models';
 
 export interface CreateProductPayload {
   name: string;
@@ -130,6 +137,26 @@ export class ProductsService {
     return this.http.delete<unknown>(`${this.api}/products/${productId}`);
   }
 
+  updateProductCommercial(productId: string, payload: UpdateProductCommercialPayload) {
+    return this.http.patch<unknown>(`${this.api}/products/${productId}/commercial`, payload).pipe(
+      map((response) => this.extractSingleProduct(response)),
+      switchMap((product) => of(product ? this.normalizeProduct(product) : null))
+    );
+  }
+
+  createStockAdjustment(productId: string, payload: CreateStockAdjustmentPayload) {
+    return this.http.post<unknown>(`${this.api}/products/${productId}/stock-adjustments`, payload).pipe(
+      map((response) => this.normalizeStockAdjustmentItem(this.extractSource(response)))
+    );
+  }
+
+  getStockAdjustments(productId: string, query: GetStockAdjustmentsQuery = {}) {
+    const params = this.buildStockAdjustmentsQueryParams(query);
+    return this.http
+      .get<unknown>(`${this.api}/products/${productId}/stock-adjustments`, { params })
+      .pipe(map((response) => this.normalizeStockAdjustmentsListResponse(response, query.page ?? 1, query.limit ?? 20)));
+  }
+
   private buildProductsQueryParams(params: GetProductsParams): Record<string, string> {
     const query: Record<string, string> = {};
     if (params.page != null) {
@@ -163,6 +190,20 @@ export class ProductsService {
       query['sortOrder'] = params.sortOrder;
     }
     return query;
+  }
+
+  private buildStockAdjustmentsQueryParams(query: GetStockAdjustmentsQuery): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (query.page != null) {
+      params['page'] = String(Math.max(1, Number(query.page)));
+    }
+    if (query.limit != null) {
+      params['limit'] = String(Math.max(1, Number(query.limit)));
+    }
+    if (query.reason) {
+      params['reason'] = query.reason;
+    }
+    return params;
   }
 
   private normalizeProductsListResponse(response: unknown, fallbackPage: number, fallbackLimit: number): ProductsListResponse {
@@ -233,6 +274,61 @@ export class ProductsService {
     };
   }
 
+  private normalizeStockAdjustmentsListResponse(
+    response: unknown,
+    fallbackPage: number,
+    fallbackLimit: number
+  ): StockAdjustmentsListResponse {
+    const source = this.extractSource(response);
+    const itemsSource = Array.isArray(source['items']) ? source['items'] : [];
+    const metaSource = this.toRecord(source['meta']) ?? {};
+    const items = itemsSource
+      .map((item) => this.normalizeStockAdjustmentItem(item))
+      .filter((item): item is StockAdjustmentItem => !!item);
+
+    const page = this.toNumber(metaSource['page'], Math.max(1, fallbackPage));
+    const limit = this.toNumber(metaSource['limit'], Math.max(1, fallbackLimit));
+    const totalItems = this.toNumber(metaSource['totalItems'], items.length);
+    const totalPages = this.toNumber(metaSource['totalPages'], Math.max(1, Math.ceil(totalItems / Math.max(1, limit))));
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: this.toBoolean(metaSource['hasNextPage'], page < totalPages),
+        hasPreviousPage: this.toBoolean(metaSource['hasPreviousPage'], page > 1)
+      }
+    };
+  }
+
+  private normalizeStockAdjustmentItem(input: unknown): StockAdjustmentItem | null {
+    const record = this.toRecord(input);
+    if (!record) {
+      return null;
+    }
+    const id = String(record['id'] ?? '').trim();
+    const productId = String(record['productId'] ?? '').trim();
+    if (!id || !productId) {
+      return null;
+    }
+
+    return {
+      id,
+      productId,
+      previousStock: this.toNumber(record['previousStock'], 0),
+      delta: this.toNumber(record['delta'], 0),
+      newStock: this.toNumber(record['newStock'], 0),
+      reason: this.toReason(record['reason']),
+      reference: typeof record['reference'] === 'string' ? record['reference'] : null,
+      note: typeof record['note'] === 'string' ? record['note'] : null,
+      createdByAdminUserId: this.toNumber(record['createdByAdminUserId'], 0),
+      createdAt: typeof record['createdAt'] === 'string' ? record['createdAt'] : ''
+    };
+  }
+
   private extractSingleProduct(response: unknown): Product | null {
     if (response && typeof response === 'object') {
       const record = response as Record<string, unknown>;
@@ -247,6 +343,13 @@ export class ProductsService {
     }
 
     return null;
+  }
+
+  private extractSource(response: unknown): Record<string, unknown> {
+    const record = this.toRecord(response) ?? {};
+    const data = this.toRecord(record['data']);
+    const nestedData = this.toRecord(data?.['data']);
+    return nestedData ?? data ?? record;
   }
 
   private normalizeCategory(category: unknown, categoryId: string, name: string, description?: string): ProductCategory {
@@ -331,6 +434,22 @@ export class ProductsService {
       }
     }
     return fallback;
+  }
+
+  private toReason(value: unknown): 'restock' | 'damage' | 'return' | 'cycle_count' | 'manual' {
+    const normalized = String(value ?? '')
+      .toLowerCase()
+      .trim();
+    switch (normalized) {
+      case 'restock':
+      case 'damage':
+      case 'return':
+      case 'cycle_count':
+      case 'manual':
+        return normalized;
+      default:
+        return 'manual';
+    }
   }
 
   private toRecord(value: unknown): Record<string, unknown> | null {

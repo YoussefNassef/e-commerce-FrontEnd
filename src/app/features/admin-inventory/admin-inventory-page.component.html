@@ -1,0 +1,276 @@
+<section class="inventory-shell" dir="rtl">
+  <header class="hero">
+    <div class="hero-copy">
+      <span class="kicker">Inventory Pro</span>
+      <h1>مركز مراقبة وتسوية المخزون</h1>
+      <p>متابعة الحركة اليومية، كشف الانحرافات، وتنفيذ الإصلاحات بشكل آمن وسريع.</p>
+    </div>
+  </header>
+
+  @if (notice()) {
+    <div class="notice success">{{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="notice error">{{ error() }}</div>
+  }
+
+  <app-card>
+    <div class="section-head">
+      <h2>تقرير حركة المخزون</h2>
+      <div class="actions">
+        <label class="field small">
+          <span>آخر</span>
+          <select [formControl]="controlsForm.controls.days">
+            <option [value]="7">7 أيام</option>
+            <option [value]="14">14 يوم</option>
+            <option [value]="30">30 يوم</option>
+            <option [value]="60">60 يوم</option>
+            <option [value]="90">90 يوم</option>
+          </select>
+        </label>
+        <app-button [disabled]="anyActionInFlight()" (pressed)="loadReport()">
+          @if (loadingReport()) { جاري التحديث... } @else { تحديث التقرير }
+        </app-button>
+      </div>
+    </div>
+
+    @if (!report() && loadingReport()) {
+      <app-loading-spinner label="جاري تحميل التقرير..." />
+    } @else if (report(); as currentReport) {
+      <div class="kpis">
+        <article class="kpi in">
+          <small>الوارد</small>
+          <strong>{{ currentReport.totals.inMovement }}</strong>
+        </article>
+        <article class="kpi out">
+          <small>الصادر</small>
+          <strong>{{ currentReport.totals.outMovement }}</strong>
+        </article>
+        <article class="kpi net" [ngClass]="{ negative: currentReport.totals.netMovement < 0 }">
+          <small>الصافي</small>
+          <strong>{{ currentReport.totals.netMovement }}</strong>
+        </article>
+        <article class="kpi adj">
+          <small>عدد التعديلات</small>
+          <strong>{{ currentReport.totals.adjustmentsCount }}</strong>
+        </article>
+      </div>
+
+      <div class="meta-line">
+        <span>من {{ formatDate(currentReport.startDate) }}</span>
+        <span>إلى {{ formatDate(currentReport.endDate) }}</span>
+      </div>
+
+      @if (hasSeries()) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>وارد</th>
+                <th>صادر</th>
+                <th>صافي</th>
+                <th>تعديلات</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of currentReport.series; track row.date) {
+                <tr [ngClass]="{ 'negative-row': row.netMovement < 0 }">
+                  <td>{{ formatDate(row.date) }}</td>
+                  <td>{{ row.inMovement }}</td>
+                  <td>{{ row.outMovement }}</td>
+                  <td>{{ row.netMovement }}</td>
+                  <td>{{ row.adjustmentsCount }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <app-state-panel title="لا توجد بيانات حركة" message="لا توجد سجلات حركة خلال الفترة المحددة." />
+      }
+    }
+  </app-card>
+
+  <app-card>
+    <div class="section-head">
+      <h2>فحص التسوية</h2>
+      <div class="actions wrap">
+        <label class="check">
+          <input type="checkbox" [formControl]="controlsForm.controls.notifyAdmins" />
+          إشعار المشرفين
+        </label>
+        <label class="check">
+          <input type="checkbox" [formControl]="controlsForm.controls.forceNotify" />
+          تجاوز التهدئة (Force Notify)
+        </label>
+        <app-button variant="secondary" [disabled]="anyActionInFlight()" (pressed)="runChecker()">
+          @if (runningChecker()) { جاري الفحص... } @else { تشغيل الفحص }
+        </app-button>
+      </div>
+    </div>
+
+    @if (reconciliation(); as rec) {
+      <div class="summary-grid">
+        <div class="summary-tile">
+          <span>عدد المنتجات المفحوصة</span>
+          <strong>{{ rec.checkedProducts }}</strong>
+        </div>
+        <div class="summary-tile">
+          <span>عدد الانحرافات</span>
+          <strong>{{ rec.anomaliesCount }}</strong>
+        </div>
+        <div class="summary-tile">
+          <span>وقت الإنشاء</span>
+          <strong>{{ formatDate(rec.generatedAt, true) }}</strong>
+        </div>
+      </div>
+
+      @if (rec.anomalies.length) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>النوع</th>
+                <th>المنتج / SKU</th>
+                <th>المخزون</th>
+                <th>المحجوز</th>
+                <th>المتوقع</th>
+                <th>الفرق</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of rec.anomalies; track item.productId) {
+                <tr [ngClass]="anomalySeverityClass(item.type)">
+                  <td>{{ anomalyTypeText(item.type) }}</td>
+                  <td>
+                    <strong>{{ item.productName || 'بدون اسم' }}</strong>
+                    <small>{{ item.sku || '-' }}</small>
+                  </td>
+                  <td>{{ item.stock }}</td>
+                  <td>{{ item.reservedStock }}</td>
+                  <td>{{ item.expectedReservedStock ?? '-' }}</td>
+                  <td>{{ item.difference ?? '-' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <app-state-panel title="لا توجد انحرافات" message="نتيجة الفحص الحالية لا تحتوي على مشاكل." />
+      }
+    } @else {
+      <app-state-panel title="لم يتم تشغيل الفحص بعد" message="شغّل الفحص لعرض نتائج التسوية." />
+    }
+  </app-card>
+
+  <app-card>
+    <div class="section-head">
+      <h2>إصلاح عدم التطابق</h2>
+      <div class="actions">
+        <app-button variant="secondary" [disabled]="anyActionInFlight()" (pressed)="runDryRunFix()">
+          @if (runningDryRun()) { جاري المعاينة... } @else { معاينة الإصلاح (Dry Run) }
+        </app-button>
+        <app-button variant="danger" [disabled]="anyActionInFlight()" (pressed)="openApplyConfirmation()">تطبيق الإصلاح</app-button>
+      </div>
+    </div>
+
+    @if (fixResult(); as fix) {
+      <div class="summary-grid">
+        <div class="summary-tile">
+          <span>حالة التنفيذ</span>
+          <strong>{{ fix.dryRun ? 'معاينة' : 'تطبيق فعلي' }}</strong>
+        </div>
+        <div class="summary-tile">
+          <span>عدد المرشحين</span>
+          <strong>{{ fix.candidatesCount }}</strong>
+        </div>
+        <div class="summary-tile">
+          <span>عدد العناصر المصححة</span>
+          <strong>{{ fix.fixedCount }}</strong>
+        </div>
+      </div>
+
+      @if (fix.fixedItems.length) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>المنتج</th>
+                <th>قبل</th>
+                <th>المتوقع</th>
+                <th>بعد</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of fix.fixedItems; track item.productId) {
+                <tr>
+                  <td>
+                    <strong>{{ item.productName || 'بدون اسم' }}</strong>
+                    <small>{{ item.sku || '-' }}</small>
+                  </td>
+                  <td>{{ item.beforeReservedStock }}</td>
+                  <td>{{ item.expectedReservedStock }}</td>
+                  <td>{{ item.afterReservedStock }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    } @else {
+      <app-state-panel title="لا توجد نتائج معاينة" message="شغّل Dry Run أولًا قبل التطبيق الفعلي." />
+    }
+  </app-card>
+
+  <app-card>
+    <div class="section-head">
+      <h2>تنبيه نقص المخزون</h2>
+      <div class="actions">
+        <label class="check">
+          <input type="checkbox" [formControl]="controlsForm.controls.forceLowStock" />
+          إرسال إجباري (Force)
+        </label>
+        <app-button [disabled]="anyActionInFlight()" (pressed)="triggerLowStockAlerts()">
+          @if (triggeringLowStock()) { جاري الإرسال... } @else { إرسال تنبيه نقص المخزون }
+        </app-button>
+      </div>
+    </div>
+
+    @if (lowStockResult(); as lowStock) {
+      <div class="summary-grid">
+        <div class="summary-tile">
+          <span>الحد الأدنى</span>
+          <strong>{{ lowStock.threshold }}</strong>
+        </div>
+        <div class="summary-tile">
+          <span>منتجات قليلة المخزون</span>
+          <strong>{{ lowStock.totalLowStockProducts }}</strong>
+        </div>
+        <div class="summary-tile">
+          <span>الإشعارات المنشأة</span>
+          <strong>{{ lowStock.notificationsCreated }}</strong>
+        </div>
+        <div class="summary-tile">
+          <span>تخطي بسبب التهدئة</span>
+          <strong>{{ lowStock.skippedByCooldown ? 'نعم' : 'لا' }}</strong>
+        </div>
+      </div>
+    }
+  </app-card>
+
+  @if (confirmationOpen()) {
+    <div class="modal-backdrop" (click)="closeApplyConfirmation()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <h3>تأكيد تطبيق الإصلاح</h3>
+        <p>سيتم تعديل قيمة <strong>reservedStock</strong> فقط للعناصر غير المتطابقة. هل تريد المتابعة؟</p>
+        <div class="modal-actions">
+          <app-button variant="secondary" [disabled]="applyingFix()" (pressed)="closeApplyConfirmation()">إلغاء</app-button>
+          <app-button variant="danger" [disabled]="applyingFix()" (pressed)="confirmApplyFix()">
+            @if (applyingFix()) { جاري التطبيق... } @else { نعم، تطبيق الإصلاح }
+          </app-button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, map } from 'rxjs/operators';
-import { throwError } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
+import { catchError, finalize, map, shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../models/environment';
 import { PaymentResult } from '../models/api.models';
 
@@ -14,20 +14,50 @@ export interface CreatePaymentPayload {
   cvc: string;
 }
 
+export interface CreatePaymentOptions {
+  headers?: Record<string, string>;
+  forceNewAttempt?: boolean;
+}
+
+export interface PaymentReconcileSummary {
+  scanned: number;
+  paid: number;
+  failed: number;
+  unchanged: number;
+  errors: number;
+}
+
+interface StoredPaymentAttempt {
+  attemptId: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PaymentsService {
+  private static readonly attemptsStorageKey = 'payment_attempts_v1';
+
   private readonly http = inject(HttpClient);
   private readonly api = environment.apiBaseUrl;
-  private readonly idempotencyByOrder = new Map<string, string>();
+  private readonly inFlightByOrder = new Map<string, Observable<PaymentResult>>();
 
-  createPayment(payload: CreatePaymentPayload) {
-    const idempotencyKey = this.getOrCreateIdempotencyKey(payload.orderId);
-    return this.http
-      .post<unknown>(`${this.api}/payments/moyasar`, payload, {
-        headers: {
-          'idempotency-key': idempotencyKey
-        }
-      })
+  createPayment(payload: CreatePaymentPayload, options: CreatePaymentOptions = {}): Observable<PaymentResult> {
+    const orderId = payload.orderId.trim();
+    const attemptKey = options.forceNewAttempt ? this.startNewAttempt(orderId) : this.getOrCreateAttemptKey(orderId);
+
+    if (!options.forceNewAttempt) {
+      const existingInFlight = this.inFlightByOrder.get(orderId);
+      if (existingInFlight) {
+        return existingInFlight;
+      }
+    }
+
+    const headers: Record<string, string> = {
+      ...(options.headers ?? {}),
+      'idempotency-key': attemptKey,
+      'x-idempotency-key': attemptKey
+    };
+
+    const request$ = this.http
+      .post<unknown>(`${this.api}/payments/moyasar`, payload, { headers })
       .pipe(
         map((response) => this.normalizePaymentResponse(response)),
         catchError((error) => {
@@ -35,16 +65,23 @@ export class PaymentsService {
             return throwError(() => error);
           }
 
-          // Legacy fallback for older backend builds that still expose /payments/create.
           return this.http
-            .post<unknown>(`${this.api}/payments/create`, payload, {
-              headers: {
-                'idempotency-key': idempotencyKey
-              }
-            })
+            .post<unknown>(`${this.api}/payments/create`, payload, { headers })
             .pipe(map((response) => this.normalizePaymentResponse(response)));
-        })
+        }),
+        tap((result) => {
+          if (result.status === 'paid') {
+            this.clearPaymentAttemptKey(orderId);
+          }
+        }),
+        finalize(() => {
+          this.inFlightByOrder.delete(orderId);
+        }),
+        shareReplay(1)
       );
+
+    this.inFlightByOrder.set(orderId, request$);
+    return request$;
   }
 
   syncPayment(paymentId: string) {
@@ -55,6 +92,75 @@ export class PaymentsService {
         }
       })
       .pipe(map((response) => this.normalizePaymentResponse(response)));
+  }
+
+  reconcilePayments() {
+    return this.http.post<unknown>(`${this.api}/payments/reconcile`, {}).pipe(map((response) => this.normalizeReconcileSummary(response)));
+  }
+
+  getOrCreateAttemptKey(orderId: string): string {
+    const normalizedOrderId = orderId.trim();
+    if (!normalizedOrderId) {
+      return '';
+    }
+
+    const store = this.readAttemptsStore();
+    const existing = store[normalizedOrderId];
+    if (existing?.attemptId) {
+      return this.composeAttemptKey(normalizedOrderId, existing.attemptId);
+    }
+
+    const attemptId = this.generateAttemptId();
+    store[normalizedOrderId] = { attemptId };
+    this.writeAttemptsStore(store);
+    return this.composeAttemptKey(normalizedOrderId, attemptId);
+  }
+
+  startNewAttempt(orderId: string): string {
+    const normalizedOrderId = orderId.trim();
+    if (!normalizedOrderId) {
+      return '';
+    }
+
+    const store = this.readAttemptsStore();
+    const attemptId = this.generateAttemptId();
+    store[normalizedOrderId] = { attemptId };
+    this.writeAttemptsStore(store);
+    return this.composeAttemptKey(normalizedOrderId, attemptId);
+  }
+
+  clearPaymentAttemptKey(orderId: string): void {
+    const normalizedOrderId = orderId.trim();
+    if (!normalizedOrderId) {
+      return;
+    }
+
+    const store = this.readAttemptsStore();
+    delete store[normalizedOrderId];
+    this.writeAttemptsStore(store);
+    this.inFlightByOrder.delete(normalizedOrderId);
+  }
+
+  handleOrderStatusChange(orderId: string, status: string): void {
+    const normalized = status.toLowerCase().trim();
+    if (normalized === 'paid' || normalized === 'completed' || normalized === 'cancelled') {
+      this.clearPaymentAttemptKey(orderId);
+    }
+  }
+
+  private normalizeReconcileSummary(response: unknown): PaymentReconcileSummary {
+    const base = this.toRecord(response) ?? {};
+    const data = this.toRecord(base['data']);
+    const nested = this.toRecord(data?.['data']);
+    const source = nested ?? data ?? base;
+
+    return {
+      scanned: this.toNumber(source['scanned']),
+      paid: this.toNumber(source['paid']),
+      failed: this.toNumber(source['failed']),
+      unchanged: this.toNumber(source['unchanged']),
+      errors: this.toNumber(source['errors'])
+    };
   }
 
   private normalizePaymentResponse(response: unknown): PaymentResult {
@@ -115,12 +221,59 @@ export class PaymentsService {
     return undefined;
   }
 
+  private readAttemptsStore(): Record<string, StoredPaymentAttempt> {
+    const sessionRaw = sessionStorage.getItem(PaymentsService.attemptsStorageKey);
+    if (sessionRaw) {
+      try {
+        const parsed = JSON.parse(sessionRaw) as Record<string, StoredPaymentAttempt>;
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    const raw = localStorage.getItem(PaymentsService.attemptsStorageKey);
+    if (!raw) {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Record<string, StoredPaymentAttempt>;
+      const normalized = parsed && typeof parsed === 'object' ? parsed : {};
+      sessionStorage.setItem(PaymentsService.attemptsStorageKey, JSON.stringify(normalized));
+      localStorage.removeItem(PaymentsService.attemptsStorageKey);
+      return normalized;
+    } catch {
+      return {};
+    }
+  }
+
+  private writeAttemptsStore(value: Record<string, StoredPaymentAttempt>): void {
+    sessionStorage.setItem(PaymentsService.attemptsStorageKey, JSON.stringify(value));
+    localStorage.removeItem(PaymentsService.attemptsStorageKey);
+  }
+
+  private composeAttemptKey(orderId: string, attemptId: string): string {
+    return `pay:${orderId}:${attemptId}`;
+  }
+
+  private generateAttemptId(): string {
+    const stamp = Date.now().toString(36);
+    const rand = Math.random().toString(36).slice(2, 10);
+    return `${stamp}${rand}`;
+  }
+
   private pickString(value: unknown): string | null {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
   }
 
   private toRecord(value: unknown): Record<string, unknown> | null {
     return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+  }
+
+  private toNumber(value: unknown): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   private readUrlFields(value: Record<string, unknown> | null): string | null {
@@ -182,23 +335,4 @@ export class PaymentsService {
   private isHttpUrl(value: string): boolean {
     return /^https?:\/\//i.test(value.trim());
   }
-
-  private buildIdempotencyKey(orderId: string): string {
-    const shortOrder = orderId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12) || 'order';
-    const stamp = Date.now().toString(36);
-    const rand = Math.random().toString(36).slice(2, 8);
-    return `checkout-${shortOrder}-${stamp}-${rand}`;
-  }
-
-  private getOrCreateIdempotencyKey(orderId: string): string {
-    const existing = this.idempotencyByOrder.get(orderId);
-    if (existing) {
-      return existing;
-    }
-
-    const created = this.buildIdempotencyKey(orderId);
-    this.idempotencyByOrder.set(orderId, created);
-    return created;
-  }
-
 }

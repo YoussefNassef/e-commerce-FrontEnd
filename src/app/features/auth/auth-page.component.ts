@@ -36,6 +36,13 @@ export class AuthPageComponent {
     code: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]],
   });
 
+  constructor() {
+    const reason = this.route.snapshot.queryParamMap.get('reason')?.trim();
+    if (reason === 'session_expired') {
+      this.error.set('انتهت الجلسة، سجل الدخول مرة أخرى.');
+    }
+  }
+
   protected setMode(mode: 'signin' | 'register'): void {
     this.mode.set(mode);
     this.stage.set('phone');

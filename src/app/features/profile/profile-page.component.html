@@ -88,5 +88,54 @@
         </app-button>
       </form>
     </app-card>
+
+    <app-card class="profile-panel sessions-panel">
+      <div class="panel-head">
+        <h2>إدارة الجلسات والأجهزة</h2>
+        <span class="panel-tag">Security</span>
+      </div>
+
+      <div class="sessions-actions">
+        <app-button type="button" variant="secondary" (pressed)="loadSessions()" [disabled]="loadingSessions()">
+          @if (loadingSessions()) { جار التحديث... } @else { تحديث الأجهزة }
+        </app-button>
+        <app-button
+          type="button"
+          variant="danger"
+          (pressed)="logoutOtherDevices()"
+          [disabled]="loggingOutOthers()"
+        >
+          @if (loggingOutOthers()) { جار التنفيذ... } @else { تسجيل الخروج من الأجهزة الأخرى }
+        </app-button>
+      </div>
+
+      @if (!loadingSessions() && sessions().length === 0) {
+        <p class="sessions-empty">لا توجد جلسات إضافية حالياً.</p>
+      }
+
+      <div class="sessions-list">
+        @for (session of sessions(); track session.id) {
+          <div class="session-item" [class.current]="session.isCurrent">
+            <div class="session-meta">
+              <strong>{{ session.isCurrent ? 'الجهاز الحالي' : 'جهاز مسجل' }}</strong>
+              <span>آخر نشاط: {{ session.lastUsedAt || session.createdAt | date: 'short' : '' : 'ar' }}</span>
+              <span>ينتهي: {{ session.expiresAt | date: 'short' : '' : 'ar' }}</span>
+              @if (session.userAgent) { <small>{{ session.userAgent }}</small> }
+              @if (session.ipAddress) { <small>IP: {{ session.ipAddress }}</small> }
+            </div>
+            @if (!session.isCurrent) {
+              <app-button
+                type="button"
+                variant="ghost"
+                (pressed)="revokeOneSession(session.id)"
+                [disabled]="revokingSessionId() === session.id"
+              >
+                @if (revokingSessionId() === session.id) { جار الإنهاء... } @else { إنهاء الجلسة }
+              </app-button>
+            }
+          </div>
+        }
+      </div>
+    </app-card>
   </div>
 </section>

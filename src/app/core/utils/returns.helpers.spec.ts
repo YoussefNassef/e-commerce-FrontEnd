@@ -22,17 +22,17 @@ describe('returns.helpers', () => {
   });
 
   it('handles customer cancel visibility logic', () => {
-    expect(canCustomerCancelReturn('requested')).toBeTrue();
-    expect(canCustomerCancelReturn('approved')).toBeFalse();
-    expect(canCustomerCancelReturn('rejected')).toBeFalse();
-    expect(canCustomerCancelReturn('refund_initiated')).toBeFalse();
-    expect(canCustomerCancelReturn('refunded')).toBeFalse();
-    expect(canCustomerCancelReturn('cancelled')).toBeFalse();
+    expect(canCustomerCancelReturn('requested')).toBeTruthy();
+    expect(canCustomerCancelReturn('approved')).toBeFalsy();
+    expect(canCustomerCancelReturn('rejected')).toBeFalsy();
+    expect(canCustomerCancelReturn('refund_initiated')).toBeFalsy();
+    expect(canCustomerCancelReturn('refunded')).toBeFalsy();
+    expect(canCustomerCancelReturn('cancelled')).toBeFalsy();
   });
 
   it('returns valid admin next statuses only', () => {
-    expect(getAllowedNextAdminStatuses('requested').includes('approved')).toBeTrue();
-    expect(getAllowedNextAdminStatuses('requested').includes('refunded')).toBeFalse();
+    expect(getAllowedNextAdminStatuses('requested').includes('approved')).toBeTruthy();
+    expect(getAllowedNextAdminStatuses('requested').includes('refunded')).toBeFalsy();
     expect(getAllowedNextAdminStatuses('approved')).toEqual(['refund_initiated']);
   });
 });

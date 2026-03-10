@@ -1,198 +1,279 @@
 <section class="orders-shell" dir="rtl">
   <header class="page-head">
     <div>
-      <p class="eyebrow">Admin Tracking</p>
-      <h1>إدارة الطلبات والشحن</h1>
-      <p class="lead">تحديث حالة التوصيل وبيانات التتبع مع عرض الخط الزمني الفعلي.</p>
+      <p class="eyebrow">Admin Operations</p>
+      <h1>إدارة عمليات الطلبات</h1>
+      <p class="lead">تنفيذ إجراءات مفردة أو جماعية على الطلبات مع سجل تدقيق إداري كامل.</p>
+    </div>
+    <div class="head-actions">
+      <app-button type="button" variant="secondary" [disabled]="reconcilingPayments()" (pressed)="runPaymentReconciliation()">
+        @if (reconcilingPayments()) { جاري التسوية... } @else { تسوية المدفوعات }
+      </app-button>
+      <app-button type="button" variant="secondary" [disabled]="loadingList()" (pressed)="loadOrdersList()">
+        @if (loadingList()) { جاري التحديث... } @else { تحديث قائمة الطلبات }
+      </app-button>
     </div>
   </header>
 
   @if (toastMessage()) {
-    <div class="banner" [class.ok]="toastType() === 'success'" [class.err]="toastType() === 'error'">
-      {{ toastMessage() }}
-    </div>
+    <div class="banner" [class.ok]="toastType() === 'success'" [class.err]="toastType() === 'error'">{{ toastMessage() }}</div>
+  }
+  @if (listError()) {
+    <div class="banner err">{{ listError() }}</div>
+  }
+  @if (orderError()) {
+    <div class="banner err">{{ orderError() }}</div>
   }
 
-  @if (error()) {
-    <div class="banner err">{{ error() }}</div>
-  }
-
-  <section class="orders-grid">
-    <app-card class="editor-card">
-      <form [formGroup]="form" class="editor-form" (ngSubmit)="saveTracking()">
-        <div class="lookup-row">
-          <label class="field field-wide">
-            <span>رقم الطلب (UUID)</span>
-            <input formControlName="orderId" type="text" class="input" placeholder="550e8400-e29b-41d4-a716-446655440000" />
-          </label>
-          <app-button type="button" variant="secondary" [disabled]="loading()" (pressed)="loadOrder()">
-            @if (loading()) { جاري التحميل... } @else { تحميل الطلب }
-          </app-button>
+  <section class="layout-grid">
+    <app-card class="list-card">
+      <div class="panel-head">
+        <h2>قائمة الطلبات</h2>
+        <div class="lookup">
+          <form [formGroup]="lookupForm" (ngSubmit)="loadOrderByLookup()" class="lookup-form">
+            <input class="input" formControlName="orderId" type="text" placeholder="أدخل رقم الطلب (UUID)" />
+            <app-button type="submit" [disabled]="loadingOrder()">فتح الطلب</app-button>
+          </form>
         </div>
+      </div>
 
-        <div class="field-grid">
+      <div class="bulk-toolbar">
+        <label class="check">
+          <input type="checkbox" [checked]="allVisibleSelected()" (change)="toggleSelectAll(($any($event.target)).checked)" />
+          تحديد الكل
+        </label>
+        <span class="bulk-count">المحدد: {{ selectedOrdersCount() }}</span>
+      </div>
+
+      <form [formGroup]="bulkActionForm" class="bulk-form" (ngSubmit)="runBulkAction()">
+        <label class="field">
+          <span>الإجراء الجماعي</span>
+          <select class="input" formControlName="action">
+            @for (action of actionTypes; track action) {
+              <option [value]="action">{{ actionLabel(action) }}</option>
+            }
+          </select>
+        </label>
+
+        @if (currentBulkActionType() === 'update_order_status') {
           <label class="field">
-            <span>حالة التوصيل</span>
-            <select formControlName="deliveryStatus" class="input">
+            <span>حالة الطلب</span>
+            <select class="input" formControlName="orderStatus">
+              <option value="">اختر الحالة</option>
+              @for (status of orderStatuses; track status) {
+                <option [value]="status">{{ orderStatusLabel(status) }}</option>
+              }
+            </select>
+          </label>
+        }
+
+        @if (currentBulkActionType() === 'update_delivery_tracking') {
+          <label class="field">
+            <span>حالة الشحن</span>
+            <select class="input" formControlName="deliveryStatus">
+              <option value="">اختر حالة الشحن</option>
               @for (status of deliveryStatuses; track status) {
                 <option [value]="status">{{ deliveryStatusLabel(status) }}</option>
               }
             </select>
           </label>
-
-          <label class="field">
-            <span>وقت التسليم المتوقع</span>
-            <input formControlName="estimatedDeliveryAt" type="datetime-local" class="input" />
-          </label>
-        </div>
-
-        <div class="field-grid">
-          <label class="field">
-            <span>رقم التتبع @if (shouldRequireTrackingNumber()) { * }</span>
-            <input formControlName="trackingNumber" type="text" class="input" />
-          </label>
-
-          <label class="field">
-            <span>شركة الشحن</span>
-            <input formControlName="shippingCarrier" type="text" class="input" />
-          </label>
-        </div>
-
-        @if (hasTrackingNumberRuleError()) {
-          <p class="field-error">رقم التتبع مطلوب عند اختيار "تم الشحن" أو "خرج للتسليم".</p>
         }
 
-        <div class="field-grid">
-          <label class="field">
-            <span>الموقع الحالي</span>
-            <input formControlName="currentLocation" type="text" class="input" />
-          </label>
-
-          <label class="field">
-            <span>رابط التتبع</span>
-            <input formControlName="trackingUrl" type="url" class="input" />
-          </label>
-        </div>
+        @if (currentBulkActionType() === 'update_delivery_tracking') {
+          <div class="field-grid">
+            <label class="field">
+              <span>رقم التتبع</span>
+              <input class="input" formControlName="trackingNumber" type="text" />
+            </label>
+            <label class="field">
+              <span>شركة الشحن</span>
+              <input class="input" formControlName="shippingCarrier" type="text" />
+            </label>
+            <label class="field">
+              <span>رابط التتبع</span>
+              <input class="input" formControlName="trackingUrl" type="url" />
+            </label>
+            <label class="field">
+              <span>الموقع الحالي</span>
+              <input class="input" formControlName="currentLocation" type="text" />
+            </label>
+          </div>
+        }
 
         <label class="field">
-          <span>ملاحظة التتبع</span>
-          <textarea formControlName="trackingNote" rows="4" class="input"></textarea>
+          <span>ملاحظة إدارية (اختياري)</span>
+          <textarea class="input" formControlName="note" rows="2"></textarea>
         </label>
 
-        <div class="actions-row">
-          <app-button type="submit" [disabled]="saving() || loading()">
-            @if (saving()) { جاري الحفظ... } @else { حفظ تحديث التتبع }
-          </app-button>
-        </div>
+        <app-button type="submit" variant="danger" [disabled]="bulkBusy() || !hasSelectedOrders()">
+          @if (runningBulkAction()) { جاري التنفيذ... } @else { تنفيذ الإجراء الجماعي }
+        </app-button>
       </form>
+
+      <div class="orders-list">
+        @if (!orders().length && !loadingList()) {
+          <p class="empty-copy">لا توجد طلبات في القائمة الحالية.</p>
+        }
+        @for (item of orders(); track item.id) {
+          <article class="order-row" [class.active]="selectedOrderId() === item.id">
+            <label class="check">
+              <input type="checkbox" [checked]="isOrderSelected(item.id)" (change)="toggleOrderSelection(item.id, ($any($event.target)).checked)" />
+            </label>
+            <button type="button" class="order-main" (click)="openOrderDetails(item.id)">
+              <strong>#{{ item.id }}</strong>
+              <small>{{ item.userName || 'مستخدم' }}</small>
+              <small>{{ item.createdAt | date: 'medium' : '' : 'ar-SA' }}</small>
+            </button>
+            <div class="order-meta">
+              <span class="pill">{{ orderStatusLabel(item.status) }}</span>
+              <span class="pill muted">{{ deliveryStatusLabel(item.deliveryStatus) }}</span>
+              <strong>{{ item.totalAmount | currency: 'SAR' }}</strong>
+            </div>
+          </article>
+        }
+      </div>
     </app-card>
 
-    <div class="side-column">
-      <app-card class="summary-card">
+    <div class="details-column">
+      <app-card>
         <div class="panel-head">
-          <div>
-            <span class="eyebrow muted">Order Summary</span>
-            <h2>ملخص الطلب</h2>
-          </div>
-          @if (order()) {
-            <span class="status-pill dark">{{ orderStatusLabel(order()!.status) }}</span>
-          }
+          <h2>الإجراء على طلب مفرد</h2>
         </div>
 
-        @if (order()) {
-          <div class="summary-grid">
-            <div class="mini-stat">
-              <small>رقم الطلب</small>
-              <strong>#{{ order()!.id }}</strong>
-            </div>
-            <div class="mini-stat">
-              <small>إجمالي الطلب</small>
-              <strong>{{ order()!.totalAmount | currency: 'SAR' }}</strong>
-            </div>
-            <div class="mini-stat">
-              <small>عدد المنتجات</small>
-              <strong>{{ order()!.items.length }}</strong>
-            </div>
-            <div class="mini-stat">
-              <small>تاريخ الإنشاء</small>
-              <strong>{{ order()!.createdAt | date: 'medium' }}</strong>
-            </div>
-          </div>
+        @if (!selectedOrderId()) {
+          <p class="empty-copy">اختر طلبًا من القائمة أو أدخل رقم الطلب لعرض التفاصيل.</p>
         } @else {
-          <p class="empty-copy">حمّل طلبًا لعرض ملخصه هنا.</p>
+          <form [formGroup]="actionForm" class="single-action-form" (ngSubmit)="submitSingleAction()">
+            <label class="field">
+              <span>نوع الإجراء</span>
+              <select class="input" formControlName="action">
+                @for (action of actionTypes; track action) {
+                  <option [value]="action">{{ actionLabel(action) }}</option>
+                }
+              </select>
+            </label>
+
+            @if (currentActionType() === 'update_order_status') {
+              <label class="field">
+                <span>حالة الطلب</span>
+                <select class="input" formControlName="orderStatus">
+                  <option value="">اختر الحالة</option>
+                  @for (status of orderStatuses; track status) {
+                    <option [value]="status">{{ orderStatusLabel(status) }}</option>
+                  }
+                </select>
+              </label>
+            }
+
+            @if (currentActionType() === 'update_delivery_tracking') {
+              <label class="field">
+                <span>حالة الشحن</span>
+                <select class="input" formControlName="deliveryStatus">
+                  <option value="">اختر حالة الشحن</option>
+                  @for (status of deliveryStatuses; track status) {
+                    <option [value]="status">{{ deliveryStatusLabel(status) }}</option>
+                  }
+                </select>
+              </label>
+
+              <div class="field-grid">
+                <label class="field">
+                  <span>رقم التتبع</span>
+                  <input class="input" formControlName="trackingNumber" type="text" />
+                </label>
+                <label class="field">
+                  <span>شركة الشحن</span>
+                  <input class="input" formControlName="shippingCarrier" type="text" />
+                </label>
+                <label class="field">
+                  <span>رابط التتبع</span>
+                  <input class="input" formControlName="trackingUrl" type="url" />
+                </label>
+                <label class="field">
+                  <span>الموقع الحالي</span>
+                  <input class="input" formControlName="currentLocation" type="text" />
+                </label>
+                <label class="field">
+                  <span>ملاحظة التتبع</span>
+                  <input class="input" formControlName="trackingNote" type="text" />
+                </label>
+                <label class="field">
+                  <span>موعد التسليم المتوقع</span>
+                  <input class="input" formControlName="estimatedDeliveryAt" type="datetime-local" />
+                </label>
+              </div>
+            }
+
+            <label class="field">
+              <span>ملاحظة إدارية (اختياري)</span>
+              <textarea class="input" formControlName="note" rows="3"></textarea>
+            </label>
+
+            <app-button type="submit" [disabled]="singleActionBusy()">
+              @if (runningSingleAction()) { جاري التنفيذ... } @else { تنفيذ الإجراء }
+            </app-button>
+          </form>
         }
       </app-card>
 
-      <app-card class="summary-card">
+      <app-card>
         <div class="panel-head">
-          <div>
-            <span class="eyebrow muted">Tracking</span>
-            <h2>بطاقة الشحن</h2>
-          </div>
-          @if (tracking()) {
-            <span class="status-pill">{{ deliveryStatusLabel(tracking()!.deliveryStatus) }}</span>
-          }
+          <h2>إضافة ملاحظة إدارية</h2>
+        </div>
+        <form [formGroup]="noteForm" (ngSubmit)="addAdminNote()" class="note-form">
+          <textarea class="input" formControlName="note" rows="3" placeholder="اكتب الملاحظة..."></textarea>
+          <app-button type="submit" variant="secondary" [disabled]="addingAdminNote() || !selectedOrderId()">
+            @if (addingAdminNote()) { جاري الإضافة... } @else { إضافة ملاحظة }
+          </app-button>
+        </form>
+      </app-card>
+
+      <app-card>
+        <div class="panel-head">
+          <h2>سجل العمليات الإدارية</h2>
         </div>
 
-        @if (tracking()) {
-          <div class="tracking-grid">
-            <div class="tracking-item">
-              <small>شركة الشحن</small>
-              <strong>{{ tracking()!.shippingCarrier || 'غير محدد' }}</strong>
-            </div>
-            <div class="tracking-item">
-              <small>رقم التتبع</small>
-              <strong>{{ tracking()!.trackingNumber || 'غير متوفر' }}</strong>
-            </div>
-            <div class="tracking-item">
-              <small>الموقع الحالي</small>
-              <strong>{{ tracking()!.currentLocation || 'غير متوفر' }}</strong>
-            </div>
-            <div class="tracking-item">
-              <small>آخر تحديث</small>
-              <strong>{{ tracking()!.deliveryStatusUpdatedAt ? (tracking()!.deliveryStatusUpdatedAt | date: 'medium') : 'غير متوفر' }}</strong>
-            </div>
+        @if (auditError()) {
+          <div class="banner err slim">
+            {{ auditError() }}
+            <app-button variant="secondary" size="sm" [disabled]="loadingAudit() || !selectedOrderId()" (pressed)="loadAudit(auditMeta().page)">إعادة المحاولة</app-button>
+          </div>
+        }
+
+        @if (loadingAudit()) {
+          <p class="empty-copy">جاري تحميل السجل...</p>
+        } @else if (!auditItems().length) {
+          <p class="empty-copy">لا توجد عمليات إدارية بعد</p>
+        } @else {
+          <div class="audit-list">
+            @for (item of auditItems(); track item.id) {
+              <article class="audit-item" [ngClass]="auditSeverityClass(item.action)">
+                <div class="audit-head">
+                  <strong>{{ auditActionLabel(item.action) }}</strong>
+                  <small>{{ item.createdAt | date: 'medium' : '' : 'ar-SA' }}</small>
+                </div>
+                <p class="muted">Admin ID: {{ item.adminUserId }}</p>
+                @if (item.note) {
+                  <p>{{ item.note }}</p>
+                }
+                @if (transitionSummary(item)) {
+                  <p class="transition">{{ transitionSummary(item) }}</p>
+                }
+              </article>
+            }
           </div>
 
-          @if (tracking()!.trackingUrl) {
-            <a class="tracking-link" [href]="tracking()!.trackingUrl!" target="_blank" rel="noreferrer">فتح رابط التتبع</a>
-          }
-
-          @if (tracking()!.trackingNote) {
-            <p class="tracking-note">{{ tracking()!.trackingNote }}</p>
-          }
-        } @else {
-          <p class="empty-copy">بيانات التتبع ستظهر بعد تحميل الطلب.</p>
+          <div class="pagination">
+            <app-button size="sm" variant="secondary" [disabled]="!auditMeta().hasPreviousPage || loadingAudit()" (pressed)="loadAudit(auditMeta().page - 1)">
+              السابق
+            </app-button>
+            <span>صفحة {{ auditMeta().page }} من {{ auditMeta().totalPages }}</span>
+            <app-button size="sm" variant="secondary" [disabled]="!auditMeta().hasNextPage || loadingAudit()" (pressed)="loadAudit(auditMeta().page + 1)">
+              التالي
+            </app-button>
+          </div>
         }
       </app-card>
     </div>
   </section>
-
-  @if (trackingLoaded() && tracking()) {
-    <app-card class="timeline-card">
-      <div class="panel-head">
-        <div>
-          <span class="eyebrow muted">Delivery Timeline</span>
-          <h2>الخط الزمني للشحنة</h2>
-        </div>
-      </div>
-
-      @if (tracking()!.timeline.length === 0) {
-        <p class="empty-copy">لا توجد تحديثات تتبع بعد</p>
-      } @else {
-        <div class="timeline">
-          @for (event of tracking()!.timeline; track event.id) {
-            <div class="timeline-item active">
-              <span class="timeline-dot"></span>
-              <div>
-                <strong>{{ deliveryStatusLabel(event.deliveryStatus) }}</strong>
-                <small>{{ event.eventAt | date: 'medium' }}</small>
-                <p class="tracking-note">{{ event.currentLocation || event.trackingNote || 'تم تحديث حالة الشحنة.' }}</p>
-              </div>
-            </div>
-          }
-        </div>
-      }
-    </app-card>
-  }
 </section>

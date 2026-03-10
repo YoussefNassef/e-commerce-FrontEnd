@@ -24,9 +24,11 @@ export class App {
   private readonly notificationsService = inject(NotificationsService);
 
   constructor() {
+    this.auth.ensureCsrfCookie().subscribe({ error: () => undefined });
+    this.auth.ensureAuthReady().subscribe();
+
     effect(() => {
       if (this.auth.isAuthenticated()) {
-        this.auth.bootstrapSession().subscribe();
         this.refreshUnreadNotifications();
       } else {
         this.unreadNotifications.set(0);
@@ -47,8 +49,15 @@ export class App {
     this.notificationsPanelOpen.set(false);
     this.notificationPreview.set([]);
     this.unreadNotifications.set(0);
-    this.auth.logout();
-    this.router.navigateByUrl('/auth');
+
+    this.auth.logout().subscribe({
+      next: () => {
+        this.router.navigateByUrl('/auth');
+      },
+      error: () => {
+        this.router.navigateByUrl('/auth');
+      }
+    });
   }
 
   protected toggleNotificationsPanel(event: MouseEvent): void {
@@ -113,7 +122,7 @@ export class App {
         next: (response) => this.notificationPreview.set(response.items),
         error: () => {
           this.notificationPreview.set([]);
-          this.notificationsPanelError.set('تعذر تحميل الإشعارات.');
+          this.notificationsPanelError.set('???? ????? ?????????.');
         }
       });
   }

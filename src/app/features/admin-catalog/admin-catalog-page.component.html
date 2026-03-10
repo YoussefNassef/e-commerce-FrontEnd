@@ -1,8 +1,12 @@
-﻿<section class="space-y-6">
+<section class="space-y-6" dir="rtl">
   <header class="space-y-2">
     <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">إدارة الكتالوج</h1>
     <p class="text-sm text-slate-600">إضافة التصنيفات والمنتجات من مكان واحد.</p>
   </header>
+
+  @if (toastMessage()) {
+    <div class="banner" [class.ok]="toastType() === 'success'" [class.err]="toastType() === 'error'">{{ toastMessage() }}</div>
+  }
 
   @if (notice()) {
     <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-base font-medium text-emerald-800">{{ notice() }}</div>
@@ -129,7 +133,7 @@
       } @else {
         <div class="products-list">
           @for (product of products(); track product.id) {
-            <div class="item-row">
+            <div class="item-row" [class.item-row-selected]="selectedProductId() === product.id">
               <img [src]="product.mainPicture" [alt]="product.name" />
               <div>
                 <strong>{{ product.name }}</strong>
@@ -137,6 +141,15 @@
               </div>
               <div class="item-actions">
                 <app-badge [tone]="product.isActive ? 'emerald' : 'slate'">{{ product.isActive ? 'نشط' : 'غير نشط' }}</app-badge>
+                <app-button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  [disabled]="selectedProductId() === product.id"
+                  (pressed)="selectProductForInventory(product)"
+                >
+                  إدارة المخزون
+                </app-button>
                 <app-button
                   type="button"
                   size="sm"
@@ -181,5 +194,165 @@
         }
       }
     </app-card>
+
+    @if (hasSelectedProduct()) {
+      <div class="inventory-overlay" (click)="clearInventoryPanel()"></div>
+      <aside class="inventory-drawer" role="dialog" aria-modal="true" aria-label="Inventory Management Panel" (click)="$event.stopPropagation()">
+      <app-card class="inventory-card">
+        <div class="inventory-head">
+          <div>
+            <h2 class="text-xl font-semibold text-slate-900">لوحة إدارة المخزون</h2>
+            <p class="list-meta">{{ selectedProduct()!.name }} | المخزون الحالي: {{ selectedProduct()!.stock }}</p>
+          </div>
+          <app-button type="button" variant="ghost" size="sm" (pressed)="clearInventoryPanel()">إغلاق</app-button>
+        </div>
+
+        <div class="inventory-grid">
+          <section class="inventory-section">
+            <h3>البيانات التجارية</h3>
+            <form [formGroup]="commercialForm" (ngSubmit)="saveCommercialInfo()" class="grid gap-3 mt-3">
+              <label class="grid gap-1 text-sm font-semibold text-slate-700">
+                اسم المنتج
+                <input formControlName="name" type="text" class="input" />
+              </label>
+              <label class="grid gap-1 text-sm font-semibold text-slate-700">
+                السعر
+                <input formControlName="price" type="number" min="1" class="input" />
+              </label>
+
+              @if (commercialForm.errors?.['commercialUnchanged'] && (commercialForm.touched || commercialForm.dirty)) {
+                <p class="field-error">يجب تعديل الاسم أو السعر على الأقل قبل الحفظ.</p>
+              }
+              @if (commercialForm.controls.price.invalid && (commercialForm.controls.price.touched || commercialForm.controls.price.dirty)) {
+                <p class="field-error">السعر يجب أن يكون أكبر من 0.</p>
+              }
+
+              <app-button type="submit" [disabled]="savingCommercial() || commercialForm.invalid">
+                @if (savingCommercial()) { جاري الحفظ... } @else { حفظ البيانات التجارية }
+              </app-button>
+            </form>
+          </section>
+
+          <section class="inventory-section">
+            <h3>تعديل المخزون</h3>
+            <form [formGroup]="stockAdjustmentForm" (ngSubmit)="submitStockAdjustment()" class="grid gap-3 mt-3">
+              <label class="grid gap-1 text-sm font-semibold text-slate-700">
+                الكمية (delta)
+                <input formControlName="delta" type="number" step="1" class="input" />
+              </label>
+              <p class="helper">القيمة الموجبة تزيد المخزون، والقيمة السالبة تخصم من المخزون.</p>
+
+              <label class="grid gap-1 text-sm font-semibold text-slate-700">
+                السبب (اختياري)
+                <select formControlName="reason" class="input">
+                  <option value="">بدون سبب</option>
+                  @for (reason of stockReasonOptions; track reason) {
+                    <option [value]="reason">{{ stockReasonLabel(reason) }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="grid gap-1 text-sm font-semibold text-slate-700">
+                المرجع (اختياري)
+                <input formControlName="reference" type="text" maxlength="128" class="input" />
+              </label>
+
+              <label class="grid gap-1 text-sm font-semibold text-slate-700">
+                ملاحظة (اختياري)
+                <textarea formControlName="note" rows="3" maxlength="500" class="input"></textarea>
+              </label>
+
+              @if (stockAdjustmentForm.controls.delta.invalid && (stockAdjustmentForm.controls.delta.touched || stockAdjustmentForm.controls.delta.dirty)) {
+                <p class="field-error">الكمية يجب أن تكون رقمًا صحيحًا وغير صفر.</p>
+              }
+
+              <app-button type="submit" [disabled]="adjustingStock() || stockAdjustmentForm.invalid">
+                @if (adjustingStock()) { جاري التنفيذ... } @else { تنفيذ التعديل }
+              </app-button>
+            </form>
+          </section>
+        </div>
+
+        <section class="inventory-section history-section">
+          <div class="history-head">
+            <h3>سجل تعديلات المخزون</h3>
+            <form [formGroup]="historyFilterForm" class="history-filter" (ngSubmit)="applyHistoryFilter()">
+              <label class="grid gap-1 text-sm font-semibold text-slate-700">
+                تصفية حسب السبب
+                <select formControlName="reason" class="input">
+                  <option value="">كل الأسباب</option>
+                  @for (reason of stockReasonOptions; track reason) {
+                    <option [value]="reason">{{ stockReasonLabel(reason) }}</option>
+                  }
+                </select>
+              </label>
+              <app-button type="submit" size="sm" variant="secondary" [disabled]="stockHistoryLoading()">تطبيق</app-button>
+            </form>
+          </div>
+
+          @if (stockHistoryLoading()) {
+            <div class="list-state">
+              <app-loading-spinner label="جاري تحميل سجل المخزون..." />
+            </div>
+          } @else if (!stockHistoryItems().length) {
+            <div class="list-state empty-state">لا توجد حركات مخزون مطابقة للفلتر الحالي.</div>
+          } @else {
+            <div class="history-table-wrap">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th>التاريخ</th>
+                    <th>معرف المشرف</th>
+                    <th>السبب</th>
+                    <th>التغيير</th>
+                    <th>قبل</th>
+                    <th>بعد</th>
+                    <th>المرجع</th>
+                    <th>الملاحظة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of stockHistoryItems(); track item.id) {
+                    <tr>
+                      <td>{{ item.createdAt | date: 'medium': '': 'ar' }}</td>
+                      <td>#{{ item.createdByAdminUserId }}</td>
+                      <td>{{ stockReasonLabel(item.reason) }}</td>
+                      <td [class.delta-plus]="item.delta > 0" [class.delta-minus]="item.delta < 0">{{ formatDelta(item.delta) }}</td>
+                      <td>{{ item.previousStock }}</td>
+                      <td>{{ item.newStock }}</td>
+                      <td>{{ item.reference || '-' }}</td>
+                      <td>{{ item.note || '-' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div class="history-pagination">
+              <app-button
+                type="button"
+                size="sm"
+                variant="secondary"
+                [disabled]="!stockHistoryMeta().hasPreviousPage || stockHistoryLoading()"
+                (pressed)="goToHistoryPage(stockHistoryMeta().page - 1)"
+              >
+                السابق
+              </app-button>
+              <span>صفحة {{ stockHistoryMeta().page }} من {{ stockHistoryMeta().totalPages }}</span>
+              <app-button
+                type="button"
+                size="sm"
+                variant="secondary"
+                [disabled]="!stockHistoryMeta().hasNextPage || stockHistoryLoading()"
+                (pressed)="goToHistoryPage(stockHistoryMeta().page + 1)"
+              >
+                التالي
+              </app-button>
+            </div>
+          }
+        </section>
+      </app-card>
+      </aside>
+    }
   }
 </section>

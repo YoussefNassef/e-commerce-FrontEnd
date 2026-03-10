@@ -1,13 +1,15 @@
-﻿import { Component, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs/operators';
+import { AuthSessionInfo } from '../../core/models/api.models';
 import { AuthService } from '../../core/services/auth.service';
 import { ButtonComponent } from '../../shared/ui/button/button.component';
 import { CardComponent } from '../../shared/ui/card/card.component';
 
 @Component({
   selector: 'app-profile-page',
-  imports: [ReactiveFormsModule, ButtonComponent, CardComponent],
+  imports: [ReactiveFormsModule, ButtonComponent, CardComponent, DatePipe],
   templateUrl: './profile-page.component.html',
   styleUrl: './profile-page.component.css'
 })
@@ -23,6 +25,10 @@ export class ProfilePageComponent {
   protected readonly pendingPhone = signal('');
   protected readonly notice = signal('');
   protected readonly error = signal('');
+  protected readonly sessions = signal<AuthSessionInfo[]>([]);
+  protected readonly loadingSessions = signal(false);
+  protected readonly loggingOutOthers = signal(false);
+  protected readonly revokingSessionId = signal('');
 
   protected readonly profileForm = this.fb.nonNullable.group({
     fullName: ['', [Validators.required, Validators.minLength(2)]]
@@ -44,6 +50,7 @@ export class ProfilePageComponent {
     this.phoneRequestForm.setValue({
       phone: user?.phone ?? ''
     });
+    this.loadSessions();
   }
 
   protected saveProfile(): void {
@@ -151,4 +158,52 @@ export class ProfilePageComponent {
         }
       });
   }
+
+  protected loadSessions(): void {
+    this.loadingSessions.set(true);
+    this.auth
+      .getSessions()
+      .pipe(finalize(() => this.loadingSessions.set(false)))
+      .subscribe({
+        next: (items) => this.sessions.set(items.filter((item) => !item.isRevoked)),
+        error: () => this.sessions.set([]),
+      });
+  }
+
+  protected logoutOtherDevices(): void {
+    this.loggingOutOthers.set(true);
+    this.error.set('');
+    this.notice.set('');
+    this.auth
+      .logoutOtherSessions()
+      .pipe(finalize(() => this.loggingOutOthers.set(false)))
+      .subscribe({
+        next: (res) => {
+          this.notice.set(`تم تسجيل الخروج من ${res.revokedCount ?? 0} جهاز آخر.`);
+          this.loadSessions();
+        },
+        error: (err) => {
+          this.error.set(err?.error?.message ?? 'تعذر تسجيل الخروج من الأجهزة الأخرى.');
+        },
+      });
+  }
+
+  protected revokeOneSession(sessionId: string): void {
+    this.revokingSessionId.set(sessionId);
+    this.error.set('');
+    this.notice.set('');
+    this.auth
+      .revokeSession(sessionId)
+      .pipe(finalize(() => this.revokingSessionId.set('')))
+      .subscribe({
+        next: () => {
+          this.notice.set('تم إنهاء الجلسة بنجاح.');
+          this.loadSessions();
+        },
+        error: (err) => {
+          this.error.set(err?.error?.message ?? 'تعذر إنهاء الجلسة.');
+        },
+      });
+  }
 }
+

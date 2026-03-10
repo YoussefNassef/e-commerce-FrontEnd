@@ -97,3 +97,15 @@ export interface PaymentResult {
   message?: string;
   redirectUrl?: string;
 }
+
+export interface AuthSessionInfo {
+  id: string;
+  createdAt: string;
+  lastUsedAt?: string | null;
+  expiresAt: string;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  isCurrent: boolean;
+  isRevoked: boolean;
+  revokedAt?: string | null;
+}

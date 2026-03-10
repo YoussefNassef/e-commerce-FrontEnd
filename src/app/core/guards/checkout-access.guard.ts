@@ -17,7 +17,13 @@ export const checkoutAccessGuard: CanActivateFn = (route) => {
     return true;
   }
 
-  const pendingOrderId = localStorage.getItem(PENDING_ORDER_STORAGE_KEY);
+  const pendingOrderId =
+    sessionStorage.getItem(PENDING_ORDER_STORAGE_KEY) ??
+    localStorage.getItem(PENDING_ORDER_STORAGE_KEY);
+  if (!sessionStorage.getItem(PENDING_ORDER_STORAGE_KEY) && pendingOrderId) {
+    sessionStorage.setItem(PENDING_ORDER_STORAGE_KEY, pendingOrderId);
+    localStorage.removeItem(PENDING_ORDER_STORAGE_KEY);
+  }
   if (pendingOrderId) {
     return true;
   }

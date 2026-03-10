@@ -13,6 +13,7 @@ import { ButtonComponent } from '../../shared/ui/button/button.component';
 import { CardComponent } from '../../shared/ui/card/card.component';
 import { LoadingSpinnerComponent } from '../../shared/ui/loading-spinner/loading-spinner.component';
 import { StatePanelComponent } from '../../shared/ui/state-panel/state-panel.component';
+import { mapCheckoutPaymentError } from './checkout-payment-errors';
 
 @Component({
   selector: 'app-checkout-page',
@@ -214,6 +215,10 @@ export class CheckoutPageComponent {
   }
 
   protected payOrder(): void {
+    if (this.paying()) {
+      return;
+    }
+
     if (!this.orderId()) {
       this.paymentError.set('أنشئ الطلب أولًا ثم ادفع.');
       return;
@@ -266,9 +271,12 @@ export class CheckoutPageComponent {
           this.paymentStatus.set(res.status ? `حالة الدفع: ${res.status}` : (res.message ?? 'تم إرسال طلب الدفع بنجاح.'));
         },
         error: (err) => {
-          const mappedError = this.mapPaymentApiError(err);
+          const mapped = mapCheckoutPaymentError(err);
+          if (mapped.shouldResetAttemptKey && this.orderId()) {
+            this.paymentsService.startNewAttempt(this.orderId());
+          }
           this.paymentError.set(
-            mappedError || `فشلت عملية الدفع (status ${err?.status ?? 'unknown'}).`,
+            mapped.message || `فشلت عملية الدفع (status ${err?.status ?? 'unknown'}).`,
           );
         }
       });
@@ -284,6 +292,7 @@ export class CheckoutPageComponent {
       next: (order) => {
         this.currentOrderStatus.set(order.status);
         this.paymentStatus.set(`حالة الطلب: ${order.status}`);
+        this.paymentsService.handleOrderStatusChange(id, order.status);
         this.syncPendingOrderStorageByStatus(order.status);
       },
       error: (err) => {
@@ -352,6 +361,7 @@ export class CheckoutPageComponent {
         next: (order) => {
           this.currentOrderStatus.set(order.status);
           this.paymentStatus.set('تم إلغاء الطلب غير المدفوع.');
+          this.paymentsService.clearPaymentAttemptKey(id);
           this.clearPendingOrderStorage();
           this.orderId.set('');
           this.loadCart();
@@ -376,8 +386,7 @@ export class CheckoutPageComponent {
       return;
     }
 
-    const savedOrderId =
-      localStorage.getItem(CheckoutPageComponent.pendingOrderStorageKey) ?? '';
+    const savedOrderId = this.readPendingOrderStorage();
     if (!savedOrderId) {
       return;
     }
@@ -391,19 +400,23 @@ export class CheckoutPageComponent {
           return;
         }
 
+        this.paymentsService.clearPaymentAttemptKey(savedOrderId);
         this.clearPendingOrderStorage();
       },
       error: () => {
+        this.paymentsService.clearPaymentAttemptKey(savedOrderId);
         this.clearPendingOrderStorage();
       },
     });
   }
 
   private persistPendingOrder(orderId: string): void {
-    localStorage.setItem(CheckoutPageComponent.pendingOrderStorageKey, orderId);
+    sessionStorage.setItem(CheckoutPageComponent.pendingOrderStorageKey, orderId);
+    localStorage.removeItem(CheckoutPageComponent.pendingOrderStorageKey);
   }
 
   private clearPendingOrderStorage(): void {
+    sessionStorage.removeItem(CheckoutPageComponent.pendingOrderStorageKey);
     localStorage.removeItem(CheckoutPageComponent.pendingOrderStorageKey);
   }
 
@@ -415,7 +428,19 @@ export class CheckoutPageComponent {
       return;
     }
 
+    if (this.orderId()) {
+      this.paymentsService.clearPaymentAttemptKey(this.orderId());
+    }
     this.clearPendingOrderStorage();
+  }
+
+  protected startNewPaymentAttempt(): void {
+    if (!this.orderId()) {
+      return;
+    }
+    this.paymentsService.startNewAttempt(this.orderId());
+    this.paymentStatus.set('تم إنشاء محاولة دفع جديدة. يمكنك إعادة المحاولة الآن.');
+    this.paymentError.set('');
   }
 
   private normalizeAsciiDigits(value: string): string {
@@ -473,51 +498,24 @@ export class CheckoutPageComponent {
     return null;
   }
 
-  private mapPaymentApiError(err: unknown): string {
-    const errorRecord =
-      err && typeof err === 'object' ? (err as Record<string, unknown>) : {};
-    const response =
-      errorRecord['error'] && typeof errorRecord['error'] === 'object'
-        ? (errorRecord['error'] as Record<string, unknown>)
-        : {};
-
-    const messageValue = response['message'];
-    const serverMessage =
-      typeof messageValue === 'string'
-        ? messageValue
-        : Array.isArray(messageValue)
-          ? messageValue.join(', ')
-          : '';
-
-    const normalized = serverMessage.toLowerCase();
-
-    if (
-      normalized.includes('english letters only') ||
-      normalized.includes('should be english letters only')
-    ) {
-      return 'اسم حامل البطاقة يجب أن يكون بالإنجليزية فقط (A-Z).';
+  private readPendingOrderStorage(): string {
+    const sessionValue =
+      sessionStorage.getItem(CheckoutPageComponent.pendingOrderStorageKey) ?? '';
+    if (sessionValue) {
+      return sessionValue;
     }
 
-    if (normalized.includes('order reservation expired')) {
-      return 'انتهت مهلة هذا الطلب. أنشئ طلبًا جديدًا أو أعد المحاولة.';
+    const legacyValue =
+      localStorage.getItem(CheckoutPageComponent.pendingOrderStorageKey) ?? '';
+    if (legacyValue) {
+      sessionStorage.setItem(
+        CheckoutPageComponent.pendingOrderStorageKey,
+        legacyValue,
+      );
+      localStorage.removeItem(CheckoutPageComponent.pendingOrderStorageKey);
     }
 
-    if (normalized.includes('order already paid')) {
-      return 'هذا الطلب مدفوع بالفعل.';
-    }
-
-    if (normalized.includes('payment is already being processed')) {
-      return 'يوجد طلب دفع قيد المعالجة لهذا الطلب. انتظر لحظة ثم حدّث الحالة.';
-    }
-
-    if (normalized.includes('order has no payable amount')) {
-      return 'قيمة الطلب غير صالحة للدفع. راجع الطلب ثم حاول مرة أخرى.';
-    }
-
-    if (normalized.includes('you are not allowed')) {
-      return 'لا يمكنك الدفع لهذا الطلب.';
-    }
-
-    return serverMessage;
+    return legacyValue;
   }
+
 }
