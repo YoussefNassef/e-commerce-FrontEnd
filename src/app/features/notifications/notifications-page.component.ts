@@ -105,6 +105,14 @@ export class NotificationsPageComponent {
   }
 
   protected notificationLink(notification: AppNotification): { path: string; queryParams?: Record<string, string> } | null {
+    const supportTicketId = this.extractSupportTicketId(notification);
+    if (supportTicketId) {
+      if (this.auth.user()?.role === 'admin') {
+        return { path: '/admin/support', queryParams: { ticketId: supportTicketId } };
+      }
+      return { path: '/support', queryParams: { ticketId: supportTicketId } };
+    }
+
     const orderId = typeof notification.data?.['orderId'] === 'string' ? notification.data['orderId'] : '';
     if (orderId) {
       if (this.auth.user()?.role === 'admin') {
@@ -113,6 +121,31 @@ export class NotificationsPageComponent {
       return { path: '/orders' };
     }
     return null;
+  }
+
+  private extractSupportTicketId(notification: AppNotification): string {
+    const data = notification.data;
+    if (!data) {
+      return '';
+    }
+
+    const candidates: unknown[] = [
+      data['ticketId'],
+      data['ticket_id'],
+      data['supportTicketId'],
+      data['support_ticket_id']
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim()) {
+        return candidate.trim();
+      }
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return String(candidate);
+      }
+    }
+
+    return '';
   }
 
   protected notificationTypeLabel(type: string): string {

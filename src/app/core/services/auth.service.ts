@@ -46,6 +46,8 @@ export class AuthService {
       .pipe(
         tap((response) => {
           const user = this.extractUser(response, phone);
+          const token = this.tryExtractToken(response);
+          this.setAccessToken(token);
           this.setSession(user);
         }),
         switchMap((response) =>
@@ -122,7 +124,11 @@ export class AuthService {
   }
 
   authHeaderValue(): string | null {
-    return null;
+    const token = this.tokenSignal();
+    if (!token || !token.trim()) {
+      return null;
+    }
+    return `Bearer ${token}`;
   }
 
   updateLocalProfile(payload: { fullName: string; phone: string }): void {
@@ -248,7 +254,14 @@ export class AuthService {
   }
 
   private requestRefreshToken(apiBase: string) {
-    return this.http.post<Record<string, unknown>>(`${apiBase}/auth/refresh`, {}, { withCredentials: true });
+    return this.http.post<Record<string, unknown>>(`${apiBase}/auth/refresh`, {}, { withCredentials: true }).pipe(
+      tap((response) => {
+        const token = this.tryExtractToken(response);
+        if (token) {
+          this.setAccessToken(token);
+        }
+      })
+    );
   }
 
   private resolveRefreshFallbackApi(error: unknown): string | null {
@@ -301,6 +314,14 @@ export class AuthService {
     }
 
     return normalized;
+  }
+
+  private tryExtractToken(response: Record<string, unknown>): string | null {
+    try {
+      return this.extractToken(response);
+    } catch {
+      return null;
+    }
   }
 
   private extractUser(response: Record<string, unknown>, phone: string): ApiUser {

@@ -535,6 +535,21 @@ src/app/
 - [environment.ts](/d:/Programming/E-Commerce/front_End/angular-starter/src/app/core/models/environment.ts)
   - عنوان الـ API
 
+## Support SSE auth + unread behavior
+
+- دعم الـ SSE في صفحات الدعم (عميل + أدمن) أصبح يعتمد على `Authorization: Bearer <token>` بشكل صريح.
+- تم استبدال الاتصال المباشر بـ `EventSource` بطبقة مخصصة:
+  - [support-stream.service.ts](/d:/Programming/E-Commerce/front_End/angular-starter/src/app/core/services/support-stream.service.ts)
+  - تتولى `connect/disconnect` + reconnect بآلية exponential backoff.
+- العدادات غير المقروءة أصبحت server-driven بالكامل:
+  - `unreadCount` من قائمة التذاكر
+  - و`/support/tickets/unread-count` و`/admin/support/tickets/unread-count`
+- عند فتح تفاصيل التذكرة يتم استدعاء `GET /support/tickets/:id` (أو نسخة الأدمن) ثم تحديث عداد غير المقروء فورًا، لأن القراءة أصبحت per-message read receipts من الباك.
+- في حالة rate limit (`429`) داخل صفحات الدعم:
+  - تظهر رسالة واضحة للمستخدم
+  - مع زر "إعادة المحاولة"
+  - بدون حلقات retry عدوانية.
+
 ## خلاصة سريعة
 
 إذا أردت فهم المشروع بسرعة، فاعتبره مقسمًا إلى 3 طبقات وظيفية:

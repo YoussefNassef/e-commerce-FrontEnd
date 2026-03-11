@@ -1,0 +1,163 @@
+<section class="support-shell" dir="rtl">
+  <header class="page-head">
+    <h1>الدعم الفني</h1>
+    <p>افتح تذكرة جديدة وتابع الردود من فريق الدعم.</p>
+  </header>
+
+  @if (notice()) {
+    <div class="banner ok">{{ notice() }}</div>
+  }
+  @if (error()) {
+    <div class="banner err">{{ error() }}</div>
+  }
+  @if (rateLimitMessage()) {
+    <div class="banner warn">
+      <span>{{ rateLimitMessage() }}</span>
+      <app-button variant="ghost" size="sm" (pressed)="retryAfterRateLimit()">إعادة المحاولة</app-button>
+    </div>
+  }
+
+  <div class="layout">
+    <app-card>
+      <h2>تذكرة جديدة</h2>
+      <div class="form-grid">
+        <label>
+          <span>العنوان</span>
+          <input
+            type="text"
+            [ngModel]="createForm().subject"
+            (ngModelChange)="updateDraft({ subject: $event })"
+            placeholder="مثال: مشكلة في تأكيد الدفع"
+          />
+        </label>
+
+        <label>
+          <span>رقم الطلب (اختياري)</span>
+          <input
+            type="text"
+            [ngModel]="createForm().orderId"
+            (ngModelChange)="updateDraft({ orderId: $event })"
+            placeholder="Order ID"
+          />
+        </label>
+
+        <label>
+          <span>الأولوية</span>
+          <select [ngModel]="createForm().priority" (ngModelChange)="updateDraft({ priority: $event })">
+            @for (priority of priorities; track priority) {
+              <option [value]="priority">{{ priorityLabel(priority) }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          <span>التصنيف</span>
+          <select [ngModel]="createForm().category" (ngModelChange)="updateDraft({ category: $event })">
+            @for (category of categories; track category) {
+              <option [value]="category">{{ categoryLabel(category) }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="full">
+          <span>الرسالة</span>
+          <textarea
+            rows="5"
+            [ngModel]="createForm().message"
+            (ngModelChange)="updateDraft({ message: $event })"
+            placeholder="اكتب تفاصيل المشكلة"
+          ></textarea>
+        </label>
+      </div>
+
+      <app-button [disabled]="creating()" (pressed)="submitTicket()">
+        @if (creating()) { جاري الإرسال... } @else { إرسال التذكرة }
+      </app-button>
+    </app-card>
+
+    <div class="tickets-layout">
+      <app-card>
+        <header class="panel-head">
+          <h2>تذاكري</h2>
+          <span class="live-chip" [class.offline]="!streamConnected()">
+            {{ streamConnected() ? 'مباشر' : 'غير متصل' }}
+          </span>
+          @if (unreadCount() > 0) {
+            <span class="unread-chip">{{ unreadCount() }} غير مقروءة</span>
+          }
+          <app-button variant="ghost" size="sm" (pressed)="loadTickets()">تحديث</app-button>
+        </header>
+
+        @if (loading()) {
+          <p class="muted">جاري تحميل التذاكر...</p>
+        } @else if (!tickets().length) {
+          <app-state-panel title="لا توجد تذاكر" message="عند إنشاء أول تذكرة ستظهر هنا." />
+        } @else {
+          <div class="ticket-list">
+            @for (ticket of tickets(); track ticket.id) {
+              <button type="button" class="ticket-item" [class.active]="selectedTicketId() === ticket.id" (click)="openTicket(ticket.id)">
+                <strong>{{ ticket.subject }}</strong>
+                @if (ticket.unreadCount > 0) {
+                  <span class="ticket-unread">{{ ticket.unreadCount }} جديد</span>
+                }
+                <small>{{ statusLabel(ticket.status) }} • {{ priorityLabel(ticket.priority) }}</small>
+                <small>{{ ticket.updatedAt | date: 'short' }}</small>
+              </button>
+            }
+          </div>
+        }
+      </app-card>
+
+      <app-card>
+        @if (loadingDetails()) {
+          <p class="muted">جاري تحميل التفاصيل...</p>
+        } @else if (!selectedTicket()) {
+          <app-state-panel title="اختر تذكرة" message="افتح تذكرة من القائمة لعرض المحادثة." />
+        } @else {
+          <header class="detail-head">
+            <h2>{{ selectedTicket()!.subject }}</h2>
+            <p>
+              {{ statusLabel(selectedTicket()!.status) }} •
+              {{ priorityLabel(selectedTicket()!.priority) }} •
+              {{ categoryLabel(selectedTicket()!.category) }}
+            </p>
+          </header>
+
+          <div class="detail-actions">
+            @if (selectedTicket()!.status === 'closed') {
+              <app-button variant="secondary" [disabled]="changingTicketState()" (pressed)="reopenSelectedTicket()">
+                @if (changingTicketState()) { جاري... } @else { إعادة فتح التذكرة }
+              </app-button>
+            } @else {
+              <app-button variant="ghost" [disabled]="changingTicketState()" (pressed)="closeSelectedTicket()">
+                @if (changingTicketState()) { جاري... } @else { إغلاق التذكرة }
+              </app-button>
+            }
+          </div>
+
+          <div class="messages">
+            @for (message of selectedTicket()!.messages; track message.id) {
+              <article class="message" [class.admin]="message.authorRole === 'admin'">
+                <strong>{{ message.authorRole === 'admin' ? 'الدعم' : 'أنت' }}</strong>
+                <p>{{ message.message }}</p>
+                <small>{{ message.createdAt | date: 'short' }}</small>
+              </article>
+            }
+          </div>
+
+          @if (canReply(selectedTicket()!.status)) {
+            <label class="reply-box">
+              <span>رد جديد</span>
+              <textarea rows="4" [ngModel]="replyMessage()" (ngModelChange)="replyMessage.set($event)" placeholder="اكتب ردك"></textarea>
+            </label>
+            <app-button [disabled]="replying() || !replyMessage().trim()" (pressed)="sendReply()">
+              @if (replying()) { جاري الإرسال... } @else { إرسال الرد }
+            </app-button>
+          } @else {
+            <p class="muted">تم إيقاف الرد لأن التذكرة {{ selectedTicket()!.status === 'closed' ? 'مغلقة' : 'تم حلها' }}.</p>
+          }
+        }
+      </app-card>
+    </div>
+  </div>
+</section>

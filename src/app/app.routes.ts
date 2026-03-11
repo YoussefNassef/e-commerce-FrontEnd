@@ -74,6 +74,11 @@ export const routes: Routes = [
       import('./features/notifications/notifications-page.component').then((m) => m.NotificationsPageComponent)
   },
   {
+    path: 'support',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/support/support-page.component').then((m) => m.SupportPageComponent)
+  },
+  {
     path: 'admin',
     canActivate: [authGuard, adminGuard],
     loadComponent: () => import('./features/admin/admin-dashboard-page.component').then((m) => m.AdminDashboardPageComponent)
@@ -109,6 +114,11 @@ export const routes: Routes = [
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
       import('./features/admin-inventory/admin-inventory-page.component').then((m) => m.AdminInventoryPageComponent)
+  },
+  {
+    path: 'admin/support',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./features/admin/admin-support-page.component').then((m) => m.AdminSupportPageComponent)
   },
   {
     path: 'profile',
